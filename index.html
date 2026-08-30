@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zeva: In-Context Causal Interaction Memory for Embodied Action Generalization</title>
+  <meta name="description" content="Zeva is a frozen-policy embodied AI framework that accumulates causal interaction memory from real-world attempts and uses it to keep improving without any gradient updates.">
+  <style>
+    :root{--ink:#1d2433;--muted:#5b6677;--line:#e7eaf0;--accent:#4f46e5;--accent-soft:#eef2ff;--bg:#fff;--bg-soft:#f7f9fb;}
+    html{scroll-behavior:smooth;}
+    body{font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);background:var(--bg);margin:0;line-height:1.6;-webkit-font-smoothing:antialiased;}
+    .section{padding:4rem 1.5rem;}
+    .container{width:100%;max-width:980px;margin:0 auto;}
+    .tight{max-width:820px;margin-inline:auto;}
+    .hero-head{position:relative;overflow:hidden;background:linear-gradient(180deg,#eef2ff 0%,#fff 100%);border-bottom:1px solid var(--line);text-align:center;}
+    .hero-head .container{position:relative;z-index:1;}
+    .title-main{font-weight:800;line-height:1.12;color:var(--ink);font-size:2.35rem;margin:.2rem 0 .5rem;}
+    .title-main .brand{color:var(--accent);}
+    .subtitle-main{color:var(--muted);font-weight:500;margin:0 auto;font-size:1.08rem;max-width:760px;}
+    .authors{margin:1.5rem 0 .4rem;line-height:2;}
+    .authors a{color:var(--ink);font-weight:600;border-bottom:2px solid var(--accent-soft);text-decoration:none;}
+    .authors a:hover{border-color:var(--accent);}
+    .sup{color:var(--accent);font-weight:700;font-size:.8em;}
+    .affil{color:var(--muted);font-size:.92rem;margin-top:.5rem;line-height:1.7;}
+    .links{margin:1.8rem 0 0;display:flex;flex-wrap:wrap;gap:.6rem;justify-content:center;}
+    .btn-pill{display:inline-flex;align-items:center;gap:.5rem;background:var(--ink);color:#fff;border-radius:999px;padding:.55rem 1.15rem;font-weight:600;font-size:.95rem;text-decoration:none;transition:transform .12s ease,background .12s ease;}
+    .btn-pill:hover{transform:translateY(-2px);background:#000;color:#fff;}
+    .btn-pill.alt{background:var(--accent);}
+    .btn-pill.alt:hover{background:#3730a3;}
+    .btn-pill.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);}
+    .btn-pill.ghost:hover{background:var(--bg-soft);}
+    h2.sec{font-weight:800;font-size:1.8rem;line-height:1.25;text-align:center;margin:0 auto 1.6rem;}
+    h2.sec::after{content:"";display:block;width:56px;height:3px;background:var(--accent);border-radius:3px;margin:.45rem auto 0;}
+    .lead{font-size:1.06rem;line-height:1.8;color:#37414f;max-width:880px;margin:0 auto;}
+    .lead .hl{background:linear-gradient(transparent 60%,var(--accent-soft) 60%);font-weight:600;color:var(--ink);}
+    figure.fig{margin:2rem auto 0;text-align:center;}
+    figure.fig img{display:block;width:100%;height:auto;border-radius:8px;border:1px solid var(--line);box-shadow:0 10px 30px rgba(20,30,50,.06);background:#fff;}
+    figure.fig figcaption{color:var(--muted);font-size:.9rem;margin-top:.8rem;line-height:1.6;max-width:840px;margin-left:auto;margin-right:auto;}
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:2.5rem 0 1rem;}
+    @media(max-width:768px){.stats{grid-template-columns:1fr;}}
+    .stat{display:flex;min-height:120px;flex-direction:column;align-items:center;justify-content:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:1.2rem 1rem;text-align:center;box-shadow:0 8px 24px rgba(20,30,50,.04);}
+    .stat .num{font-weight:800;font-size:1.8rem;color:var(--accent);}
+    .stat .lab{color:var(--muted);font-size:.85rem;margin-top:.3rem;line-height:1.4;}
+    .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:1.6rem;}
+    @media(max-width:768px){.grid3{grid-template-columns:1fr;}}
+    .card{border:1px solid var(--line);border-radius:12px;padding:1.25rem 1.3rem;background:#fff;box-shadow:0 8px 24px rgba(20,30,50,.04);}
+    .card .tag{display:inline-block;font-weight:700;color:var(--accent);font-size:.78rem;letter-spacing:.03em;text-transform:uppercase;}
+    .card h4{font-weight:700;margin:.35rem 0 .45rem;font-size:1.08rem;}
+    .card p{color:var(--muted);font-size:.95rem;line-height:1.6;}
+    .soft{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+    .table-scroll{overflow-x:auto;margin-top:1.5rem;}
+    table.paper-table{width:100%;border-collapse:collapse;background:#fff;font-size:.95rem;border-top:2px solid #1f2937;border-bottom:2px solid #1f2937;}
+    table.paper-table th,table.paper-table td{padding:.55rem .6rem;border-bottom:1px solid #eef0f4;text-align:center;}
+    table.paper-table th{font-weight:700;color:var(--ink);}
+    table.paper-table tbody tr:last-child th,table.paper-table tbody tr:last-child td{border-bottom:0;}
+    table.paper-table .ours{background:var(--accent-soft);font-weight:800;}
+    table.paper-table .best{color:var(--accent);font-weight:800;}
+    .case-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;align-items:start;margin-top:1.2rem;}
+    @media(max-width:768px){.case-grid{grid-template-columns:repeat(2,1fr);}}
+    .case-grid .task{font-size:.82rem;font-weight:700;color:var(--ink);text-align:left;padding-top:.35rem;}
+    .case-grid img{width:100%;border-radius:6px;border:1px solid var(--line);display:block;}
+    .case-grid .cap{font-size:.75rem;color:var(--muted);margin-top:.2rem;}
+    .qual{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+    .twocol{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;align-items:start;margin-top:1.5rem;}
+    @media(max-width:768px){.twocol{grid-template-columns:1fr;}}
+    pre.bib{background:#f5f7fa;color:#1d2433;border:1px solid var(--line);border-radius:8px;padding:1.2rem 1.3rem;overflow:auto;font-size:.85rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
+    footer{border-top:1px solid var(--line);padding:2rem 1.5rem;text-align:center;color:var(--muted);font-size:.85rem;}
+    .placeholder{color:#98a1ad;font-style:italic;}
+  </style>
+</head>
+<body>
+<header class="hero-head section">
+  <div class="container">
+    <h1 class="title-main">Zeva: In-Context Causal Interaction Memory for <span class="brand">Embodied Action Generalization</span></h1>
+    <p class="subtitle-main">A robot foundation model that keeps improving after deployment — no gradient updates, no weight changes, only interaction memory.</p>
+    <div class="authors">Author One<sup>*</sup>, Author Two<sup>*</sup>, Author Three, Author Four<br><span class="sup">*</span> Equal contribution &nbsp;·&nbsp; <span class="placeholder">Institution / Lab</span> &nbsp;·&nbsp; <span class="placeholder">contact@example.com</span></div>
+    <div class="affil"><span class="placeholder">Institute / University</span> &nbsp;·&nbsp; <span class="placeholder">City, Country</span></div>
+    <div class="links"><a class="btn-pill" href="#">arXiv</a><a class="btn-pill alt" href="#">Code</a><a class="btn-pill ghost" href="#">PDF</a><a class="btn-pill ghost" href="#bibtex">BibTeX</a></div>
+  </div>
+</header>
+<section class="section" style="padding-top:2.5rem;padding-bottom:2.5rem;">
+  <div class="container tight">
+    <figure class="fig"><img src="assets/qualitative/pw4-s.jpg" alt="Real-world Zeva execution"><figcaption><b>Real-world Zeva execution.</b> After failed attempts, the same frozen policy successfully pours water in ChemLab-Evo, guided by persistent interaction memory. During deployment, only the memory is updated; the policy weights remain frozen.</figcaption></figure>
+    <div class="stats">
+      <div class="stat"><div class="num">76.8%</div><div class="lab">Avg. success on RoboCasa365-Atomic5<br>(+4.4 pt over Fast-WAM)</div></div>
+      <div class="stat"><div class="num">83.3%</div><div class="lab">Avg. success on ChemLab-Evo Level-1 real robot tasks</div></div>
+      <div class="stat"><div class="num">20/20</div><div class="lab">Pick Up Test Tube after repeated-attempt self-evolution</div></div>
+    </div>
+  </div>
+</section>
+<section class="section soft">
+  <div class="container tight">
+    <h2 class="sec">Abstract</h2>
+    <p class="lead">Large-scale pretraining has given rise to robot foundation models, but their behavior is fixed after deployment: they cannot absorb the irregular, ever-changing physical world. Zeva closes this loop with a <span class="hl">Causal Interaction Memory</span> that is accumulated online from the robot's own interactions and retrieved at every decision. It extracts the action–state-change causal structure through Visual-Behavioral Dynamics, stores experience on dual timescales (Brief Interaction Trace and Persistent Interaction Memory), and injects a compact memory context into a frozen Cosmos3-based action-generation policy. On RoboCasa365, Zeva reaches <b>76.8% average success</b>, outperforming strong baselines including Fast-WAM; on a real-world chemical-lab benchmark, it improves from repeated attempts without any gradient update, and a human demonstration can warm-start the same frozen policy through memory alone.</p>
+  </div>
+</section>
+<section class="section">
+  <div class="container">
+    <h2 class="sec">Method</h2>
+    <p class="lead" style="max-width:880px;">Zeva is built around one idea: the robot should not only execute from pretrained weights; it should remember what its own actions caused, and let that memory guide the next attempt.</p>
+    <div class="grid3">
+      <div class="card"><span class="tag">Stage 1</span><h4>Causal Interaction Extraction</h4><p>Visual-Behavioral Dynamics (VBD) records each executed action and the visual state change it caused, recursively forming a Causal Interaction State and task-phase tokens.</p></div>
+      <div class="card"><span class="tag">Stage 2</span><h4>Dual-timescale Interaction Memory</h4><p>A Brief Interaction Trace keeps within-attempt context; a Persistent Interaction Memory accumulates across attempts with similarity-based merging, preserving reusable action–effect evidence.</p></div>
+      <div class="card"><span class="tag">Stage 3</span><h4>Memory-Conditioned Policy</h4><p>A Memory Context Encoder fuses both memory streams with task/phase information into clean semantic tokens, injected into a frozen Cosmos3 generation split. Only memory updates at deployment.</p></div>
+    </div>
+  </div>
+</section>
+<section class="section soft">
+  <div class="container">
+    <h2 class="sec">Post-Deployment Capability Scaling</h2>
+    <p class="lead" style="max-width:880px;">Zeva improves as it interacts. With all policy parameters frozen, cumulative success rises across repeated attempts on both simulation and real hardware.</p>
+    <div class="twocol">
+      <figure class="fig"><img src="assets/aggregate_csr.png" alt="RoboCasa365 cumulative success rate"><figcaption><b>RoboCasa365.</b> Pooled cumulative success rate over five tasks rises from 26% at Evolve 1 to 73% at Evolve 4, without updating model weights.</figcaption></figure>
+      <figure class="fig"><img src="assets/real_world_scaling.png" alt="Real-world ChemLab-Evo scaling"><figcaption><b>ChemLab-Evo (real ARX manipulator).</b> Pick Up Test Tube rises from 65% to 100%, Place Beaker from 25% to 70%, Pour Water from 30% to 80%.</figcaption></figure>
+    </div>
+    <h2 class="sec" style="margin-top:3rem;">Benchmark Results</h2>
+    <div class="table-scroll">
+      <table class="paper-table">
+        <thead><tr><th>Method</th><th>ElectricKettle</th><th>ToasterOvenDoor</th><th>Microwave</th><th>CoffeeSetupMug</th><th>StandMixerHead</th><th>Avg.</th></tr></thead>
+        <tbody>
+          <tr><td>LingBot-VA</td><td>63</td><td>60</td><td>70</td><td>35</td><td>48</td><td>55.2</td></tr>
+          <tr><td>Xiaomi-Robotics-1</td><td>17</td><td>16</td><td>82</td><td>6</td><td>35</td><td>31.2</td></tr>
+          <tr><td>&tau;<sub>0</sub>-WM</td><td>15</td><td>32</td><td>63</td><td>12</td><td>23</td><td>29.0</td></tr>
+          <tr><td>Fast-WAM</td><td><b>88</b></td><td>66</td><td>60</td><td><b>54</b></td><td><b>94</b></td><td>72.4</td></tr>
+          <tr><td>Cosmos3-Nano</td><td>76</td><td>74</td><td>76</td><td>6</td><td>92</td><td>64.8</td></tr>
+          <tr class="ours"><td>Zeva</td><td>78</td><td><b>86</b></td><td><b>84</b></td><td>44</td><td>92</td><td><span class="best">76.8</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Success rates (%) on RoboCasa365-Atomic5. Bold marks the best per task; shaded row is Zeva.</p>
+    <h2 class="sec" style="margin-top:3rem;">Ablation: Two Memory Timescales</h2>
+    <div class="table-scroll">
+      <table class="paper-table">
+        <thead><tr><th>BIT</th><th>PIM</th><th>Pick Up Test Tube</th><th>Place Beaker</th><th>Pour Water</th><th>Titration</th><th>Salt Solution</th></tr></thead>
+        <tbody>
+          <tr class="ours"><td>&#10003;</td><td>&#10003;</td><td><b>20/20</b></td><td><b>14/20</b></td><td><b>16/20</b></td><td><b>14/20</b></td><td><b>14/20</b></td></tr>
+          <tr><td>&nbsp;</td><td>&#10003;</td><td>16/20</td><td>10/20</td><td>10/20</td><td>8/20</td><td>11/20</td></tr>
+          <tr><td>&#10003;</td><td>&nbsp;</td><td>17/20</td><td>12/20</td><td>14/20</td><td>12/20</td><td>10/20</td></tr>
+          <tr><td>&nbsp;</td><td>&nbsp;</td><td>13/20</td><td>8/20</td><td>9/20</td><td>5/20</td><td>7/20</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Real-world ablation on five ChemLab-Evo tasks. BIT and PIM provide complementary context; disabling both gives the weakest performance.</p>
+  </div>
+</section>
+<section class="section">
+  <div class="container">
+    <h2 class="sec">What Interaction Memory Changes in the Real World</h2>
+    <p class="lead" style="max-width:880px;">On the ARX manipulator, later attempts correct the exact physical errors seen in earlier attempts: grasp alignment, release pose, and pouring tilt.</p>
+    <div class="case-grid">
+      <div class="task">Pick Up Test Tube</div>
+      <div><img src="assets/qualitative/putp1-f.jpg" alt="Attempt 1"><div class="cap">Attempt 1 (fail)</div></div>
+      <div><img src="assets/qualitative/putp2-f.jpg" alt="Attempt 2"><div class="cap">Attempt 2 (fail)</div></div>
+      <div><img src="assets/qualitative/putp3-s.jpg" alt="Attempt 3"><div class="cap">Attempt 3 (success)</div></div>
+      <div><img src="assets/qualitative/putb4-s.jpg" alt="Attempt 4"><div class="cap">Attempt 4 (success)</div></div>
+      <div class="task">Place Beaker</div>
+      <div><img src="assets/qualitative/pb1-f.jpg" alt="Attempt 1"><div class="cap">Attempt 1 (fail)</div></div>
+      <div><img src="assets/qualitative/pb2-f.jpg" alt="Attempt 2"><div class="cap">Attempt 2 (fail)</div></div>
+      <div><img src="assets/qualitative/pb3-s.jpg" alt="Attempt 3"><div class="cap">Attempt 3 (success)</div></div>
+      <div><img src="assets/qualitative/pb4-s.jpg" alt="Attempt 4"><div class="cap">Attempt 4 (success)</div></div>
+      <div class="task">Pour Water</div>
+      <div><img src="assets/qualitative/pw1-f.jpg" alt="Attempt 1"><div class="cap">Attempt 1 (fail)</div></div>
+      <div><img src="assets/qualitative/pw2-f.jpg" alt="Attempt 2"><div class="cap">Attempt 2 (fail)</div></div>
+      <div><img src="assets/qualitative/pw3-f.jpg" alt="Attempt 3"><div class="cap">Attempt 3 (fail)</div></div>
+      <div><img src="assets/qualitative/pw4-s.jpg" alt="Attempt 4"><div class="cap">Attempt 4 (success)</div></div>
+    </div>
+  </div>
+</section>
+<section class="section qual">
+  <div class="container">
+    <h2 class="sec">Human Demonstrations Warm-Start the Same Frozen Policy</h2>
+    <p class="lead" style="max-width:880px;">A human physically guides the robot through Balance Weighing; VBD encodes the demonstration into Persistent Interaction Memory. The frozen policy then reproduces the demonstrated approach, grasp, transfer, and placement — no gradient update needed.</p>
+    <div class="twocol">
+      <figure class="fig"><img src="assets/ICL/threeinone.png" alt="Overlaid trajectories"><figcaption>Human (red), model-only without warm-up (orange), and Zeva after memory warm-up (green) end-effector trajectories.</figcaption></figure>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;">
+        <figure class="fig" style="margin:0;"><img src="assets/ICL/R1.jpg" alt="Approach"><figcaption>Approach</figcaption></figure>
+        <figure class="fig" style="margin:0;"><img src="assets/ICL/R2.jpg" alt="Grasp"><figcaption>Grasp</figcaption></figure>
+        <figure class="fig" style="margin:0;"><img src="assets/ICL/R3.jpg" alt="Transfer"><figcaption>Transfer</figcaption></figure>
+        <figure class="fig" style="margin:0;"><img src="assets/ICL/R4.jpg" alt="Place"><figcaption>Place</figcaption></figure>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="section" id="bibtex">
+  <div class="container tight">
+    <h2 class="sec">BibTeX</h2>
+    <pre class="bib">@misc{zeva2026,
+  title={Zeva: In-Context Causal Interaction Memory for Embodied Action Generalization},
+  author={Author One and Author Two and Author Three and Author Four},
+  year={2026},
+  eprint={XXXX.XXXXX},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/XXXX.XXXXX},
+}</pre>
+  </div>
+</section>
+<footer>
+  Project page for <b>Zeva</b>: In-Context Causal Interaction Memory for Embodied Action Generalization.<br>
+  <span class="placeholder">Replace authors, affiliation, arXiv/PDF/code links with the official versions before publishing.</span>
+</footer>
+</body>
+</html>
