@@ -13,10 +13,11 @@ This folder is a ready-to-publish GitHub Pages site for the Zeva paper.
 Replace the placeholder items in `index.html`:
 
 - Authors and affiliations
-- `arXiv`, `Code`, `PDF`, and `BibTeX` links
+- `arXiv`, `Code`, `PDF`, `Model`, and `BibTeX` links
+- The `Model` button currently uses `href="#"`; replace it with the Hugging Face model URL
 - Any placeholder project page URL
 
-The `assets/` directory already contains the figures copied from the paper (scaling curves, qualitative robot images, t-SNE plots, and human warm-up images).
+The `assets/` directory contains the latest figures copied from `@zeva_paper/` (scaling curves, qualitative robot images, t-SNE plots, human warm-up images, and the architecture figure), and `assets/videos/` contains the demo videos copied from `@zeva_video/` (excluding `rollout.mp4`), compressed to 720p H.264 so they can be hosted on GitHub Pages.
 
 ## Files
 

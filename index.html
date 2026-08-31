@@ -63,6 +63,19 @@
     .qual{background:var(--bg-soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
     .twocol{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;align-items:start;margin-top:1.5rem;}
     @media(max-width:768px){.twocol{grid-template-columns:1fr;}}
+    .scaling-figs{grid-template-columns:minmax(0,1fr) minmax(0,1.296fr);align-items:center;}
+    .scaling-figs figure.fig{display:flex;flex-direction:column;justify-content:center;margin:0;}
+    .scaling-figs figure.fig img{margin:0 auto;}
+    .video-grid{display:grid;grid-template-columns:1fr;gap:1.4rem;margin-top:1.6rem;}
+    .video-card{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgba(20,30,50,.04);}
+    .video-card video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:#0b0f14;border-bottom:1px solid var(--line);}
+    .video-card h4{font-weight:700;margin:.8rem 1rem .3rem;font-size:1.02rem;}
+    .video-card p{color:var(--muted);font-size:.9rem;line-height:1.6;margin:.2rem 1rem 1rem;}
+    .effect-row{display:grid;grid-template-columns:minmax(120px,1fr) 2fr 2fr 2fr;gap:.8rem;align-items:center;margin-top:.8rem;}
+    @media(max-width:768px){.effect-row{grid-template-columns:1fr;}}
+    .effect-pair{display:flex;align-items:center;justify-content:center;gap:4px;}
+    .effect-pair img{width:86px;height:auto;border:1px solid var(--line);border-radius:4px;background:#fff;}
+    .effect-arrow{color:var(--muted);font-size:1rem;}
     pre.bib{background:#f5f7fa;color:#1d2433;border:1px solid var(--line);border-radius:8px;padding:1.2rem 1.3rem;overflow:auto;font-size:.85rem;line-height:1.55;white-space:pre-wrap;word-break:break-word;}
     footer{border-top:1px solid var(--line);padding:2rem 1.5rem;text-align:center;color:var(--muted);font-size:.85rem;}
     .placeholder{color:#98a1ad;font-style:italic;}
@@ -75,33 +88,66 @@
     <p class="subtitle-main">A robot foundation model that keeps improving after deployment — no gradient updates, no weight changes, only interaction memory.</p>
     <div class="authors">Author One<sup>*</sup>, Author Two<sup>*</sup>, Author Three, Author Four<br><span class="sup">*</span> Equal contribution &nbsp;·&nbsp; <span class="placeholder">Institution / Lab</span> &nbsp;·&nbsp; <span class="placeholder">contact@example.com</span></div>
     <div class="affil"><span class="placeholder">Institute / University</span> &nbsp;·&nbsp; <span class="placeholder">City, Country</span></div>
-    <div class="links"><a class="btn-pill" href="#">arXiv</a><a class="btn-pill alt" href="#">Code</a><a class="btn-pill ghost" href="#">PDF</a><a class="btn-pill ghost" href="#bibtex">BibTeX</a></div>
+    <div class="links"><a class="btn-pill" href="#">arXiv</a><a class="btn-pill alt" href="#">Code</a><a class="btn-pill ghost" href="#">Model</a><a class="btn-pill ghost" href="#bibtex">BibTeX</a></div>
   </div>
 </header>
 <section class="section" style="padding-top:2.5rem;padding-bottom:2.5rem;">
   <div class="container tight">
-    <figure class="fig"><img src="assets/qualitative/pw4-s.jpg" alt="Real-world Zeva execution"><figcaption><b>Real-world Zeva execution.</b> After failed attempts, the same frozen policy successfully pours water in ChemLab-Evo, guided by persistent interaction memory. During deployment, only the memory is updated; the policy weights remain frozen.</figcaption></figure>
+    <figure class="fig"><img src="assets/zeva-teaser_01.png" alt="Zeva framework overview"><figcaption><b>Zeva</b> performs In-Context Causal Learning (ICCL): a frozen policy learns from the robot’s own physical interactions by extracting action–state-change causality into a dual-timescale causal memory, and injecting it back as a Causal Prompt at decision time. During deployment, all model parameters remain frozen; only the interaction memories are updated.</figcaption></figure>
     <div class="stats">
       <div class="stat"><div class="num">76.8%</div><div class="lab">Avg. success on RoboCasa365-Atomic5<br>(+4.4 pt over Fast-WAM)</div></div>
       <div class="stat"><div class="num">83.3%</div><div class="lab">Avg. success on ChemLab-Evo Level-1 real robot tasks</div></div>
-      <div class="stat"><div class="num">20/20</div><div class="lab">Pick Up Test Tube after repeated-attempt self-evolution</div></div>
+      <div class="stat"><div class="num">100%</div><div class="lab">Pick Up Test Tube SR on ChemLab-Evo<br>(20 randomized episodes)</div></div>
     </div>
   </div>
 </section>
 <section class="section soft">
   <div class="container tight">
     <h2 class="sec">Abstract</h2>
-    <p class="lead">Large-scale pretraining has given rise to robot foundation models, but their behavior is fixed after deployment: they cannot absorb the irregular, ever-changing physical world. Zeva closes this loop with a <span class="hl">Causal Interaction Memory</span> that is accumulated online from the robot's own interactions and retrieved at every decision. It extracts the action–state-change causal structure through Visual-Behavioral Dynamics, stores experience on dual timescales (Brief Interaction Trace and Persistent Interaction Memory), and injects a compact memory context into a frozen Cosmos3-based action-generation policy. On RoboCasa365, Zeva reaches <b>76.8% average success</b>, outperforming strong baselines including Fast-WAM; on a real-world chemical-lab benchmark, it improves from repeated attempts without any gradient update, and a human demonstration can warm-start the same frozen policy through memory alone.</p>
+    <p class="lead">Zeva formulates embodied action generalization in real-world deployment as <span class="hl">In-Context Causal Learning (ICCL)</span>: a frozen robot policy learns from its own physical interaction experiences without test-time weight updates. It extracts the causality between actions and state changes through a Causal Transition Encoder, organizes experience in a Dual-timescale Causal Memory (BIT and PIM), and injects phase-matched evidence back into the frozen policy as a Causal Prompt. On RoboCasa365-Atomic5, Zeva reaches <b>76.8% average success</b>, outperforming strong baselines including Fast-WAM. On the real-world ChemLab-Evo benchmark, it achieves the best success rate at every difficulty level and exhibits success-rate scaling from its own interaction experience, with cumulative success rising from 26% to 73% across repeated attempts. A one-shot human demonstration can also warm-start the same frozen policy, further improving performance.</p>
   </div>
 </section>
+
+
+<section class="section" id="videos">
+  <div class="container">
+    <h2 class="sec">Demonstration Videos</h2>
+    <p class="lead" style="max-width:880px;">The same frozen policy improves across repeated attempts and can be warm-started by a single human demonstration. The rollout-only video is not included here.</p>
+    <div class="video-grid">
+      <div class="video-card">
+        <video controls preload="metadata" poster="assets/qualitative/putp3-s.jpg">
+          <source src="assets/videos/online_evolution_1.mp4" type="video/mp4">
+        </video>
+        <h4>Online Self-Evolution 1</h4>
+        <p>Repeated attempts on a real manipulation task: earlier failures are corrected in later attempts using Persistent Interaction Memory, while the policy weights remain frozen.</p>
+      </div>
+      <div class="video-card">
+        <video controls preload="metadata" poster="assets/qualitative/pb3-s.jpg">
+          <source src="assets/videos/online_evolution_2.mp4" type="video/mp4">
+        </video>
+        <h4>Online Self-Evolution 2</h4>
+        <p>A second example of gradient-free self-evolution across attempts, showing how causal interaction evidence changes the subsequent execution.</p>
+      </div>
+      <div class="video-card">
+        <video controls preload="metadata" poster="assets/ICL/R1.jpg">
+          <source src="assets/videos/human_demo.mp4" type="video/mp4">
+        </video>
+        <h4>One-Shot Human Warm-Up</h4>
+        <p>A human physically guides the robot once; the same frozen policy later reproduces the demonstrated sequence without any weight update.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <section class="section">
   <div class="container">
     <h2 class="sec">Method</h2>
     <p class="lead" style="max-width:880px;">Zeva is built around one idea: the robot should not only execute from pretrained weights; it should remember what its own actions caused, and let that memory guide the next attempt.</p>
     <div class="grid3">
-      <div class="card"><span class="tag">Stage 1</span><h4>Causal Interaction Extraction</h4><p>Visual-Behavioral Dynamics (VBD) records each executed action and the visual state change it caused, recursively forming a Causal Interaction State and task-phase tokens.</p></div>
-      <div class="card"><span class="tag">Stage 2</span><h4>Dual-timescale Interaction Memory</h4><p>A Brief Interaction Trace keeps within-attempt context; a Persistent Interaction Memory accumulates across attempts with similarity-based merging, preserving reusable action–effect evidence.</p></div>
-      <div class="card"><span class="tag">Stage 3</span><h4>Memory-Conditioned Policy</h4><p>A Memory Context Encoder fuses both memory streams with task/phase information into clean semantic tokens, injected into a frozen Cosmos3 generation split. Only memory updates at deployment.</p></div>
+      <div class="card"><span class="tag">Stage 1</span><h4>Causal Interaction Extraction</h4><p>A Causal Transition Encoder (CTE) integrates visual latents, action encodings, and observed effects into a Causal Interaction State, then projects it into a task Phase Token and a Causal Interaction Signal.</p></div>
+      <div class="card"><span class="tag">Stage 2</span><h4>Dual-timescale Causal Memory</h4><p>A Brief Interaction Trace (BIT) captures recent within-attempt dynamics; a Persistent Interaction Memory (PIM) consolidates cross-attempt evidence within the same episode through similarity-based merging.</p></div>
+      <div class="card"><span class="tag">Stage 3</span><h4>In-Context Policy Injection</h4><p>Zeva retrieves phase-matched interaction evidence and constructs a Causal Prompt for the frozen foundation policy. During deployment, all parameters remain frozen; only the memories are updated online.</p></div>
     </div>
   </div>
 </section>
@@ -109,8 +155,8 @@
   <div class="container">
     <h2 class="sec">Post-Deployment Capability Scaling</h2>
     <p class="lead" style="max-width:880px;">Zeva improves as it interacts. With all policy parameters frozen, cumulative success rises across repeated attempts on both simulation and real hardware.</p>
-    <div class="twocol">
-      <figure class="fig"><img src="assets/aggregate_csr.png" alt="RoboCasa365 cumulative success rate"><figcaption><b>RoboCasa365.</b> Pooled cumulative success rate over five tasks rises from 26% at Evolve 1 to 73% at Evolve 4, without updating model weights.</figcaption></figure>
+    <div class="twocol scaling-figs">
+      <figure class="fig"><img src="assets/aggregate_csr.png" alt="RoboCasa365 cumulative success rate"><figcaption><b>RoboCasa365.</b> Pooled cumulative success rate over five tasks rises from 26% at Evolve 1 to 73% at Evolve 4.</figcaption></figure>
       <figure class="fig"><img src="assets/real_world_scaling.png" alt="Real-world ChemLab-Evo scaling"><figcaption><b>ChemLab-Evo (real ARX manipulator).</b> Pick Up Test Tube rises from 65% to 100%, Place Beaker from 25% to 70%, Pour Water from 30% to 80%.</figcaption></figure>
     </div>
     <h2 class="sec" style="margin-top:3rem;">Benchmark Results</h2>
@@ -128,59 +174,118 @@
       </table>
     </div>
     <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Success rates (%) on RoboCasa365-Atomic5. Bold marks the best per task; shaded row is Zeva.</p>
+    <h2 class="sec" style="margin-top:3rem;">Real-World ChemLab-Evo Results</h2>
+    <div class="table-scroll">
+      <table class="paper-table">
+        <thead><tr><th>Method</th><th>Pick Up Test Tube</th><th>Place Beaker</th><th>Pour Water</th><th>Level 1 Avg.</th><th>Titration</th><th>Prepare Salt Solution</th><th>Level 2 Avg.</th><th>Balance Weighing</th><th>Extraction</th><th>Level 3 Avg.</th></tr></thead>
+        <tbody>
+          <tr><td>LingBot-VA</td><td>80</td><td>70</td><td>65</td><td>71.7</td><td>55</td><td>75</td><td>65.0</td><td>5</td><td>0</td><td>2.5</td></tr>
+          <tr><td>Fast-WAM</td><td>85</td><td>70</td><td>75</td><td>76.7</td><td>45</td><td>55</td><td>50.0</td><td>0</td><td>0</td><td>0.0</td></tr>
+          <tr><td>&pi;<sub>0.5</sub></td><td>95</td><td>60</td><td>65</td><td>73.3</td><td>60</td><td>50</td><td>55.0</td><td>0</td><td>0</td><td>0.0</td></tr>
+          <tr><td>Cosmos3-Nano</td><td>80</td><td>70</td><td>60</td><td>70.0</td><td>45</td><td>60</td><td>52.5</td><td>0</td><td>0</td><td>0.0</td></tr>
+          <tr class="ours"><td>Zeva</td><td><b>100</b></td><td><b>70</b></td><td><b>80</b></td><td><b>83.3</b></td><td><b>70</b></td><td><b>70</b></td><td><b>70.0</b></td><td><b>5</b></td><td><b>10</b></td><td><b>7.5</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Success rates (%) over 20 randomized episodes on the real-world ChemLab-Evo benchmark.</p>
+
+    <h2 class="sec" style="margin-top:3rem;">Long-Horizon Process Scores</h2>
+    <div class="table-scroll">
+      <table class="paper-table">
+        <thead><tr><th>Method</th><th>Balance Weighing</th><th>Extraction</th><th>Avg.</th></tr></thead>
+        <tbody>
+          <tr><td>LingBot-VA</td><td>28.75</td><td>40.00</td><td>34.38</td></tr>
+          <tr><td>Fast-WAM</td><td>22.50</td><td>58.57</td><td>40.54</td></tr>
+          <tr><td>&pi;<sub>0.5</sub></td><td>33.75</td><td>31.43</td><td>32.59</td></tr>
+          <tr><td>Cosmos3-Nano</td><td>38.75</td><td>50.71</td><td>44.73</td></tr>
+          <tr class="ours"><td>Zeva</td><td><b>47.50</b></td><td><b>67.14</b></td><td><b>57.32</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Process scores report the average percentage of ordered stages completed on the two long-horizon tasks.</p>
     <h2 class="sec" style="margin-top:3rem;">Ablation: Two Memory Timescales</h2>
     <div class="table-scroll">
       <table class="paper-table">
         <thead><tr><th>BIT</th><th>PIM</th><th>Pick Up Test Tube</th><th>Place Beaker</th><th>Pour Water</th><th>Titration</th><th>Salt Solution</th></tr></thead>
         <tbody>
-          <tr class="ours"><td>&#10003;</td><td>&#10003;</td><td><b>20/20</b></td><td><b>14/20</b></td><td><b>16/20</b></td><td><b>14/20</b></td><td><b>14/20</b></td></tr>
-          <tr><td>&nbsp;</td><td>&#10003;</td><td>16/20</td><td>10/20</td><td>10/20</td><td>8/20</td><td>11/20</td></tr>
-          <tr><td>&#10003;</td><td>&nbsp;</td><td>17/20</td><td>12/20</td><td>14/20</td><td>12/20</td><td>10/20</td></tr>
-          <tr><td>&nbsp;</td><td>&nbsp;</td><td>13/20</td><td>8/20</td><td>9/20</td><td>5/20</td><td>7/20</td></tr>
+          <tr class="ours"><td>&#10003;</td><td>&#10003;</td><td><b>100</b></td><td><b>70</b></td><td><b>80</b></td><td><b>70</b></td><td><b>70</b></td></tr>
+          <tr><td>&nbsp;</td><td>&#10003;</td><td>80</td><td>50</td><td>50</td><td>40</td><td>55</td></tr>
+          <tr><td>&#10003;</td><td>&nbsp;</td><td>85</td><td>60</td><td>70</td><td>60</td><td>50</td></tr>
+          <tr><td>&nbsp;</td><td>&nbsp;</td><td>65</td><td>40</td><td>45</td><td>25</td><td>35</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Real-world ablation on five ChemLab-Evo tasks. BIT and PIM provide complementary context; disabling both gives the weakest performance.</p>
+    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:.8rem;">Real-world ablation (SR %) on five ChemLab-Evo tasks over 20 randomized episodes. Removing PIM reduces SR by 10–20 points; removing BIT causes a larger 15–30 point drop.</p>
   </div>
 </section>
 <section class="section">
   <div class="container">
     <h2 class="sec">What Interaction Memory Changes in the Real World</h2>
-    <p class="lead" style="max-width:880px;">On the ARX manipulator, later attempts correct the exact physical errors seen in earlier attempts: grasp alignment, release pose, and pouring tilt.</p>
+    <p class="lead" style="max-width:880px;">On the ARX manipulator, red frames are terminal observations from distinct failed attempts; green frames show the subsequent successful attempt. For Pick Up Test Tube and Place Beaker, the two green frames are successive stages of the same continuous successful attempt.</p>
     <div class="case-grid">
       <div class="task">Pick Up Test Tube</div>
-      <div><img src="assets/qualitative/putp1-f.jpg" alt="Attempt 1"><div class="cap">Attempt 1 (fail)</div></div>
-      <div><img src="assets/qualitative/putp2-f.jpg" alt="Attempt 2"><div class="cap">Attempt 2 (fail)</div></div>
-      <div><img src="assets/qualitative/putp3-s.jpg" alt="Attempt 3"><div class="cap">Attempt 3 (success)</div></div>
-      <div><img src="assets/qualitative/putb4-s.jpg" alt="Attempt 4"><div class="cap">Attempt 4 (success)</div></div>
+      <div><img src="assets/qualitative/putp1-f.jpg" alt="Attempt 1"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/putp2-f.jpg" alt="Attempt 2"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/putp3-s.jpg" alt="Attempt 3"><div class="cap">Successful attempt</div></div>
+      <div><img src="assets/qualitative/putb4-s.jpg" alt="Attempt 4"><div class="cap">Same success (later stage)</div></div>
       <div class="task">Place Beaker</div>
-      <div><img src="assets/qualitative/pb1-f.jpg" alt="Attempt 1"><div class="cap">Attempt 1 (fail)</div></div>
-      <div><img src="assets/qualitative/pb2-f.jpg" alt="Attempt 2"><div class="cap">Attempt 2 (fail)</div></div>
-      <div><img src="assets/qualitative/pb3-s.jpg" alt="Attempt 3"><div class="cap">Attempt 3 (success)</div></div>
-      <div><img src="assets/qualitative/pb4-s.jpg" alt="Attempt 4"><div class="cap">Attempt 4 (success)</div></div>
+      <div><img src="assets/qualitative/pb1-f.jpg" alt="Attempt 1"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/pb2-f.jpg" alt="Attempt 2"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/pb3-s.jpg" alt="Attempt 3"><div class="cap">Successful attempt</div></div>
+      <div><img src="assets/qualitative/pb4-s.jpg" alt="Attempt 4"><div class="cap">Same success (later stage)</div></div>
       <div class="task">Pour Water</div>
-      <div><img src="assets/qualitative/pw1-f.jpg" alt="Attempt 1"><div class="cap">Attempt 1 (fail)</div></div>
-      <div><img src="assets/qualitative/pw2-f.jpg" alt="Attempt 2"><div class="cap">Attempt 2 (fail)</div></div>
-      <div><img src="assets/qualitative/pw3-f.jpg" alt="Attempt 3"><div class="cap">Attempt 3 (fail)</div></div>
-      <div><img src="assets/qualitative/pw4-s.jpg" alt="Attempt 4"><div class="cap">Attempt 4 (success)</div></div>
+      <div><img src="assets/qualitative/pw1-f.jpg" alt="Attempt 1"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/pw2-f.jpg" alt="Attempt 2"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/pw3-f.jpg" alt="Attempt 3"><div class="cap">Failed attempt</div></div>
+      <div><img src="assets/qualitative/pw4-s.jpg" alt="Attempt 4"><div class="cap">Successful attempt</div></div>
     </div>
   </div>
 </section>
+
+<section class="section soft">
+  <div class="container">
+    <h2 class="sec">Cross-Task Effect Retrieval</h2>
+    <p class="lead" style="max-width:880px;">The VBD effect token captures action-induced state changes beyond task-specific appearance. For each query transition, nearest neighbors are retrieved from other tasks by effect-token cosine similarity. Despite changes in objects, viewpoints, and instructions, the retrieval aligns functionally equivalent effects: container tilting, gripper closure, and post-grasp lifting.</p>
+    <div class="effect-row">
+      <div class="task" style="font-weight:700;">Pouring / Container Tilt</div>
+      <div class="effect-pair"><img src="assets/cross_task/pour_query_water_before.jpg" alt="Query before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/pour_query_water_after.jpg" alt="Query after"></div>
+      <div class="effect-pair"><img src="assets/cross_task/pour_match_salt_solution_before.jpg" alt="Match 1 before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/pour_match_salt_solution_after.jpg" alt="Match 1 after"></div>
+      <div class="effect-pair"><img src="assets/cross_task/pour_match_extraction_before.jpg" alt="Match 2 before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/pour_match_extraction_after.jpg" alt="Match 2 after"></div>
+    </div>
+    <div class="effect-row">
+      <div class="task" style="font-weight:700;">Gripper Closure</div>
+      <div class="effect-pair"><img src="assets/cross_task/close_query_test_tube_before.jpg" alt="Query before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/close_query_test_tube_after.jpg" alt="Query after"></div>
+      <div class="effect-pair"><img src="assets/cross_task/close_match_salt_solution_before.jpg" alt="Match 1 before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/close_match_salt_solution_after.jpg" alt="Match 1 after"></div>
+      <div class="effect-pair"><img src="assets/cross_task/close_match_extraction_before.jpg" alt="Match 2 before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/close_match_extraction_after.jpg" alt="Match 2 after"></div>
+    </div>
+    <div class="effect-row">
+      <div class="task" style="font-weight:700;">Lifting / Upward Motion</div>
+      <div class="effect-pair"><img src="assets/cross_task/lift_query_test_tube_before.jpg" alt="Query before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/lift_query_test_tube_after.jpg" alt="Query after"></div>
+      <div class="effect-pair"><img src="assets/cross_task/lift_match_salt_solution_before.jpg" alt="Match 1 before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/lift_match_salt_solution_after.jpg" alt="Match 1 after"></div>
+      <div class="effect-pair"><img src="assets/cross_task/lift_match_extraction_before.jpg" alt="Match 2 before"><span class="effect-arrow">&rarr;</span><img src="assets/cross_task/lift_match_extraction_after.jpg" alt="Match 2 after"></div>
+    </div>
+    <p class="lead" style="font-size:.9rem;text-align:center;margin-top:1.2rem;">Each block is a before&ndash;after transition pair. Effect labels are shown for interpretation and do not enter the similarity ranking.</p>
+  </div>
+</section>
+
 <section class="section qual">
   <div class="container">
-    <h2 class="sec">Human Demonstrations Warm-Start the Same Frozen Policy</h2>
-    <p class="lead" style="max-width:880px;">A human physically guides the robot through Balance Weighing; VBD encodes the demonstration into Persistent Interaction Memory. The frozen policy then reproduces the demonstrated approach, grasp, transfer, and placement — no gradient update needed.</p>
-    <div class="twocol">
-      <figure class="fig"><img src="assets/ICL/threeinone.png" alt="Overlaid trajectories"><figcaption>Human (red), model-only without warm-up (orange), and Zeva after memory warm-up (green) end-effector trajectories.</figcaption></figure>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;">
-        <figure class="fig" style="margin:0;"><img src="assets/ICL/R1.jpg" alt="Approach"><figcaption>Approach</figcaption></figure>
-        <figure class="fig" style="margin:0;"><img src="assets/ICL/R2.jpg" alt="Grasp"><figcaption>Grasp</figcaption></figure>
-        <figure class="fig" style="margin:0;"><img src="assets/ICL/R3.jpg" alt="Transfer"><figcaption>Transfer</figcaption></figure>
-        <figure class="fig" style="margin:0;"><img src="assets/ICL/R4.jpg" alt="Place"><figcaption>Place</figcaption></figure>
-      </div>
+    <h2 class="sec">One-Shot Human Warm-Up</h2>
+    <p class="lead" style="max-width:880px;">A single human-guided demonstration on Balance Weighing initializes PIM before autonomous execution. The frozen policy then reproduces the demonstrated approach, grasp, transfer, and placement — no gradient update needed. No ICL denotes execution without memory warm-up; ICL uses the demonstrated experience.</p>
+
+    <figure class="fig" style="margin:0 auto;max-width:560px;"><img src="assets/ICL/visualized.png" alt="Overlaid trajectories"><figcaption>3D comparison of human (GT), No ICL, and ICL end-effector trajectories after one-shot memory warm-up.</figcaption></figure>
+
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;">
+      <figure class="fig" style="margin:0;"><img src="assets/ICL/R1.jpg" alt="Approach"><figcaption>Approach</figcaption></figure>
+      <figure class="fig" style="margin:0;"><img src="assets/ICL/R2.jpg" alt="Grasp"><figcaption>Grasp</figcaption></figure>
+      <figure class="fig" style="margin:0;"><img src="assets/ICL/R3.jpg" alt="Transfer"><figcaption>Transfer</figcaption></figure>
+      <figure class="fig" style="margin:0;"><img src="assets/ICL/R4.jpg" alt="Place"><figcaption>Place</figcaption></figure>
     </div>
+    <figure class="fig"><img src="assets/human_demo_warmup_scaling.png" alt="Human warm-up scaling"><figcaption><b>Quantitative warm-up effect.</b> One human demonstration improves or matches SR at every evolution milestone on the three atomic ChemLab-Evo tasks; gains reach 20 points on Place Beaker and 15 points on Pour Water.</figcaption></figure>
   </div>
 </section>
+
+
 <section class="section" id="bibtex">
   <div class="container tight">
     <h2 class="sec">BibTeX</h2>
