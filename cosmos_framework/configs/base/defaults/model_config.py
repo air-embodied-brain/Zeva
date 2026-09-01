@@ -1,0 +1,380 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: OpenMDW-1.1
+
+from typing import Any
+
+import attrs
+
+from cosmos_framework.utils.lazy_config import LazyDict
+from cosmos_framework.configs.base.defaults.activation_checkpointing import ActivationCheckpointingConfig
+from cosmos_framework.configs.base.defaults.compile import CompileConfig
+from cosmos_framework.configs.base.defaults.ema import EMAConfig
+from cosmos_framework.configs.base.defaults.parallelism import ParallelismConfig
+from cosmos_framework.configs.base.defaults.reasoner import VLMConfig
+
+
+@attrs.define(slots=False)
+class DiffusionExpertConfig:
+    # This determines the range of timesteps before the fourier feature embedding is applied.
+    timestep_range: float = 1.0
+    # Whether to load the generation pathway weights from pretrained LLM/VLM weights.
+    load_weights_from_pretrained: bool = True
+
+    patch_spatial: int = 2
+    max_vae_latent_side_after_patchify: int = (
+        20  # Max dimension (h or w) of the VAE latent after patchification (320/(8*2))
+    )
+    # Vision/action/sound position information is always provided through
+    # Qwen3VL-style 3D mRoPE attention IDs.
+    enable_fps_modulation: bool = False
+    base_fps: int = 24
+    # Base temporal compression factor for SOUND m-RoPE. None = current behavior
+    # (sound advances at base_fps positions/sec). Set to the vision tcf (4) to put
+    # sound on the same latent-frame temporal grid as vision/action.
+    sound_base_temporal_compression_factor: int | None = None
+    # Temporal coordinates used for unified_3d_mrope vision tokens.
+    # - "latent_index": legacy behavior, positions are 0, 1, ..., T_latent-1.
+    # - "uniae_source_right_edge": use UniAE padded-patch right-edge source-frame coordinates.
+    vision_temporal_position_mode: str = "latent_index"
+    # For unified_3d_mrope: whether spatial (H, W) indices reset to 0 for each vision segment
+    unified_3d_mrope_reset_spatial_ids: bool = True
+    # Setting the temporal gap on the boundary of the different modalities, default is 0, using a value greater than 0 will add an additional offset on the accumulated temporal offset.
+    unified_3d_mrope_temporal_modality_margin: int = 0
+
+
+@attrs.define(slots=False)
+class LBLConfig:
+    # For load balancing loss computation.
+    # - "local": Use the fraction of tokens routed to each expert only for the local rank.
+    # - "global": Use the fraction of tokens routed to each expert across all ranks.
+    method: str = "local"
+
+    # Coefficients for the load balancing loss.
+    # - "und": Coefficient for the load balancing loss for the "und" pathway.
+    # - "gen": Coefficient for the load balancing loss for the "gen" pathway.
+    coeff_und: float | None = None
+    coeff_gen: float | None = None
+
+
+@attrs.define(slots=False)
+class RectifiedFlowTrainingConfig:
+    shift: Any = 5  # Training time shift. If dict, maps resolution (str) to shift value (int)
+    use_dynamic_shift: bool = False  # Whether to use dynamic shifting
+    train_time_image_distribution: str = "logitnormal"  # Training time distribution for images
+    train_time_video_distribution: str = "logitnormal"  # Training time distribution for videos
+    train_time_action_distribution: str = "logitnormal"  # Training time distribution for actions
+    train_time_sound_distribution: str = "logitnormal"  # Training time distribution for sound
+    train_time_weight: str = "uniform"  # Training time weight
+    loss_scale: float = 1.0  # Loss scale
+    image_loss_scale: float | None = None  # If set, overrides loss_scale for images
+    sound_loss_scale: float | None = None  # If set, overrides loss_scale for sound
+    use_discrete_rf: bool = False  # Whether to use discrete formulation of rectified flow
+
+    # user: please adjust this value according to loss_scale to balance the action loss with the video loss.
+    # default is 10.0 to align with previous training settings.
+    action_loss_weight: float = 10.0
+
+    # Independent noise schedule for action. When False (default), action shares the sigma
+    # sampled from the vision RF on every step — legacy behavior. When True, action samples
+    # its own sigma from `rectified_flow_action` using `shift_action`. Action always uses a
+    # shared scalar sigma per sample ([B,1]), independent of vision's DF mode.
+    independent_action_schedule: bool = False
+    shift_action: int | None = None  # must be int; None → inherit `shift` (which must also be int)
+
+    # Independent noise schedule for sound. When False (default), sound shares the vision
+    # sigma schedule, reindexed to the dense audio-bearing subset. When True, sound samples
+    # its own scalar sigma per sample ([B,1]) from `rectified_flow_sound` using `shift_sound`.
+    independent_sound_schedule: bool = False
+    shift_sound: int | None = None  # must be int; None → inherit `shift` (which must also be int)
+
+    # When True, per-instance flow-matching loss is normalized by the count of
+    # active (noisy) elements rather than all elements — preserves sum/active_count
+    # semantics so conditioning-heavy samples (e.g. I2V, forward_dynamics, diffusion
+    # forcing, AR rollout teacher-forcing) contribute gradient on par with K=0
+    # samples. With .mean() the gradient of a K-conditioned sample is scaled by
+    # (T-K)/T, which undertrains the attend-to-clean-history dynamics. Kept
+    # False by default to preserve legacy loss magnitudes; enable for AR/DF training.
+    normalize_loss_by_active: bool = False
+
+    # Sample-level (vs rank-level) loss averaging for the vision modality.
+    #
+    # By default the vision loss on each rank is a mean over that rank's samples, and
+    # FSDP/DDP averages gradients across ranks — so every *rank* contributes equally
+    # regardless of how many image/video samples it holds ("rank-level averaging").
+    # When ranks carry different sample counts this over-weights samples on sparse ranks.
+    #
+    # When True, the loss is renormalized so every *sample* contributes equally across
+    # the whole data-parallel group: each iteration all-reduces the total number of image
+    # and video samples over the DP group, and image and video losses are each normalized
+    # by their own global sample count and then summed. This counteracts the framework's
+    # rank-level gradient averaging so the effective objective is a true per-sample mean.
+    # The two independently normalized terms are weighted by the existing `image_loss_scale`
+    # (images; falls back to `loss_scale` when None) and `loss_scale` (videos), so their
+    # balance is tuned with the same knobs as the legacy rank-level path.
+    sample_level_loss_averaging: bool = False
+
+
+@attrs.define(slots=False)
+class ZevaPolicyConfig:
+    """Configuration for Zeva causal-context policy conditioning.
+
+    Data paths intentionally live in the dataset recipe. This model config only
+    describes the learned policy-injection prior and is disabled by default, preserving
+    every existing Cosmos recipe.
+    """
+
+    enabled: bool = False
+    global_dim: int = 256
+    phase_dim: int = 128
+    # Ordered causal observed-effect history from Stage-1 effect-v3.
+    effect_dim: int = 128
+    effect_history_length: int = 4
+    action_dim: int = 8
+    horizon: int = 32
+    num_anchors: int = 8
+    hidden_dim: int = 256
+    num_heads: int = 4
+    prior_loss_weight: float = 0.01
+    prior_dropout_rate: float = 0.4
+    prior_inference_guidance_scale: float = 0.5
+    global_prefix_tokens: int = 1
+    # Number of leading action tokens that encode a clean initial state rather
+    # than policy commands. DROID/RoboTwin use one; RoboCasa365 uses zero
+    # because its 16-D proprio state is not isomorphic to its 12-D action.
+    leading_condition_steps: int = 1
+    # Optional same-task-session transition context. The context is already
+    # encoded by TransitionMemoryEncoder before entering the model.
+    online_memory_enabled: bool = False
+    online_context_dim: int = 256
+    online_prefix_tokens: int = 1
+    # Paper-aligned Persistent Interaction Memory.  PIM is injected as a
+    # gated residual into the existing global-behavior prefix, so enabling the
+    # module with gate_init=0 preserves the verified Stage-2 forward exactly.
+    pim_memory_enabled: bool = False
+    pim_persistent_length: int = 4
+    pim_context_dim: int = 256
+    pim_gate_init: float = 0.0
+    # Static inference-only kill switch. The PIM modules remain instantiated
+    # and load their trained weights, but the forward takes the original
+    # Stage-2 prefix path without executing the PIM adapter. This is stronger
+    # than an empty validity mask because it also preserves the compiled graph
+    # used by the frozen base policy.
+    pim_force_bypass: bool = False
+
+
+# Serialized releases may still reference this fully qualified type name.
+BehaviorStage2Config = ZevaPolicyConfig
+
+
+@attrs.define(slots=False)
+class ProprioConditionConfig:
+    """Optional low-dimensional robot-state prefix for action policies."""
+
+    enabled: bool = False
+    input_dim: int = 16
+    prefix_tokens: int = 1
+
+
+@attrs.define(slots=False)
+class RectifiedFlowInferenceConfig:
+    scheduler_type: str = "unipc"  # Scheduler type
+    num_train_timesteps: int = 1000
+    shift: int = 1
+    use_dynamic_shifting: bool = False
+
+
+@attrs.define(slots=False)
+class FixedStepSamplerConfig:
+    """Config for the fixed-step sampler used by distilled models.
+
+    Uses a fixed sigma schedule instead of a smooth multi-step solver.
+
+    Mirrors the constructor args of ``FixedStepSampler``.
+    """
+
+    # Discrete noise-level schedule (descending, excluding the final 0.0 step).
+    # Convention: exclude the final 0.0 step — FixedStepSampler appends it automatically.
+    # Values must be descending. Using 0.999 instead of 1.0 avoids numeric edge cases at sigma=1.
+    t_list: list[float] = [0.999, 0.75, 0.5, 0.25]
+    # Distilled fixed-step sampling uses stochastic re-noising at each step.
+    sample_type: str = "sde"
+
+
+# Don't have any defaults and init only in config file.
+@attrs.define(slots=False)
+class OmniMoTModelConfig:
+    """
+    Config for Omni MoT model.
+    """
+
+    tokenizer: LazyDict = None
+    load_vision_tokenizer: bool = True
+    """Instantiate the vision tokenizer.
+
+    Reasoner-only inference disables this to avoid loading the generation VAE.
+    """
+    net: LazyDict = None
+    ema: EMAConfig = EMAConfig()
+
+    # Parallelism (CP, CFGP, FSDP, DP) and FSDP reduce-dtype configuration.
+    parallelism: ParallelismConfig = ParallelismConfig()
+
+    # torch.compile knobs (enabled, compiled_region, dynamic, ...).
+    compile: CompileConfig = CompileConfig()
+
+    # Activation-checkpointing policy (trade-off between memory and speed).
+    activation_checkpointing: ActivationCheckpointingConfig = ActivationCheckpointingConfig()
+
+    # Model parameter / activation dtype (consumed by MixedPrecisionPolicy and
+    # ``model.precision`` for LowPrecisionCallback). One of "bfloat16",
+    # "float16", "float32".
+    precision: str = "bfloat16"
+
+    # LoRA (parameter-efficient fine-tuning). When `lora_enabled=True`,
+    # `OmniMoTModel.build_net` injects custom LoRA adapters BEFORE FSDP wrap on
+    # the meta-device network, then re-initializes lora_A/lora_B after
+    # to_empty + init_weights. Pair with `optimizer.keys_to_select=["lora_"]`
+    # and `checkpoint.keys_to_skip_loading=[..., "lora_"]`.
+    lora_enabled: bool = False
+    lora_rank: int = 16
+    lora_alpha: int = 32
+    lora_target_modules: str = "q_proj_moe_gen,k_proj_moe_gen,v_proj_moe_gen,o_proj_moe_gen"
+    # Optional base-policy teacher anchor for LoRA post-training. The teacher
+    # is the same frozen network with adapters temporarily disabled, so this
+    # does not allocate a second copy of the model. The coefficient is applied
+    # in the same units as action_loss_weight; zero preserves legacy behavior.
+    lora_teacher_anchor_weight: float = 0.0
+    lora_teacher_anchor_data_key: str = "teacher_anchor_weight"
+
+    # Frozen-base action correction expert.  When enabled, ``build_net``
+    # freezes every base parameter and trains only the zero-initialized
+    # ``action_residual_head``.  The head is never merged into the base.
+    residual_expert: dict[str, Any] = attrs.Factory(dict)
+
+    # R3 correction-policy controls.  These are intentionally kept in the
+    # model config (rather than in the serving request) so an exported policy
+    # is a single always-on model: no phase/predicate/task router is required
+    # at inference time.  ``event_weighted`` only changes the training loss.
+    r3_event_weighted: bool = False
+    r3_event_weight: float = 2.0
+    r3_task_weight_key: str = "r3_task_weight"
+    r3_event_weight_key: str = "residual_release_event"
+
+    # Rectified flow configs
+    rectified_flow_training_config: RectifiedFlowTrainingConfig = RectifiedFlowTrainingConfig()
+    rectified_flow_inference_config: RectifiedFlowInferenceConfig = RectifiedFlowInferenceConfig()
+    # The field name is serialized in released configs; the type and all new
+    # public APIs use the Zeva paper terminology.
+    behavior_stage2: ZevaPolicyConfig = ZevaPolicyConfig()
+    proprio_condition: ProprioConditionConfig = ProprioConditionConfig()
+
+    # Optional fixed-step sampler for distilled models (None for base models).
+    fixed_step_sampler_config: FixedStepSamplerConfig | None = None
+
+    # Model configs
+    vlm_config: VLMConfig = VLMConfig()
+    diffusion_expert_config: DiffusionExpertConfig = DiffusionExpertConfig()
+    # Training data keys
+    input_video_key: str = "video"
+    input_image_key: str = "images"  # key to fetch input image from data_batch
+    input_caption_key: str = "ai_caption"  # Key used to fetch input captions
+
+    # State and sequence shapes
+    state_ch: int = 16  # for latent model, ref to the latent channel number
+    state_t: int = 8  # for latent model, ref to the latent number of frames
+    latent_downsample_factor: int = 8
+    resolution: str = "512"
+    max_num_tokens_after_packing: int = 13312  # Final num tokens after sequence packing
+
+    # Attention implementation for joint understanding + generation
+    # Note "two_way" and "three_way" disallow and remove "End-of-Vision" or other text token in the generation tower.
+    # "three_way" must only be used when introducing sparsity
+    joint_attn_implementation: str = "two_way"  # "two_way" or "three_way"
+
+    # Per-layer NATTEN parameters
+    # Must use "three_way" attention if used.
+    # If None, all attention layers remain dense.
+    # If not None, must be a list exactly the size of number of layers, and each layer can be either
+    # None (dense) or a dictionary, with at least 'kernel_size' or 'kernel_size_float' keys
+    # specifying sparsity. NATTEN parameters 'dilation' and 'stride' may also be specified either as
+    # static integers, or as floating point values that will be mapped to their domain during
+    # runtime. Integer parameters should never be mixed with floating point ones.
+    #
+    # Floating point parameters are highly recommended, unless the use case will have a fixed token
+    # layout (input resolution).
+    #
+    # Examples:
+    #   Interleaved sliding window layers, "GPT-OSS"-style, with static window size:
+    #     natten_parameter_list = [None if layer_idx % 2 != 0 else {"kernel_size": (8, 8)}]
+    #   Layers with odd indices ("None"s) will use dense attention, and layers with an even indices
+    #   will use a static sliding window size of 8x8.
+    #
+    #   Interleaved sliding window layers, "GPT-OSS"-style, with input-dependent window size:
+    #     natten_parameter_list = [None if layer_idx % 2 != 0 else {"kernel_size_float": (0.5, 0.5)}]
+    #   Layers with odd indices ("None"s) will use dense attention, and layers with an even indices
+    #   will use a dynamic window size that is 50% of the input along each of the two dimensions.
+    #
+    #   Interleaved sliding window and dilated layers, "DiNAT"-style:
+    #     natten_parameter_list = [
+    #       {
+    #           "kernel_size_float": (0.5, 0.5),
+    #           "dilation_float": (1.0, 1.0),
+    #       } if layer_idx % 2 != 0 else {
+    #           "kernel_size_float": (0.5, 0.5),
+    #       }
+    #     ]
+    #   All layers will use a dynamic window size that is 50% of the input along each of the two
+    #   dimensions. Layers with odd indices will also dilate to the maximum level possible.
+    #
+    natten_parameter_list: list | None = None
+
+    # Temporal causality for training autoregressive video generation models.
+    # When enabled, applies temporal causal attention to generation supertokens.
+    # Each supertoken is num_action_tokens_per_supertoken action tokens followed
+    # by H*W vision tokens; the value is stamped onto the packed sequence by the
+    # temporal-causal packer and read by attention/KV-cache code unchanged.
+    # Only supports image2video modes (with or without actions).
+    # Requires joint_attn_implementation="three_way".
+    video_temporal_causal: bool = False
+    # "none":             standard joint denoising (shared σ, no clean context)
+    # "teacher_forcing":  all frames noised with shared σ; clean history via cross-attention
+    # "diffusion_forcing": each latent frame gets independent σ ~ Uniform[0,1]
+    # "teacher_forcing_dcm": replayed teacher-forcing discrete-time consistency distillation
+    causal_training_strategy: str = attrs.field(
+        default="none",
+        validator=attrs.validators.in_({"none", "teacher_forcing", "diffusion_forcing", "teacher_forcing_dcm"}),
+    )
+
+    # Load balancing loss config.
+    lbl: LBLConfig = LBLConfig()
+
+    # vision configs
+    vision_gen: bool = True  # whether to use vision related parameters and condition/generate vision tokens
+
+    # action configs
+    action_gen: bool = False  # whether to use action related parameters and condition/generate action tokens
+    max_action_dim: int = 32  # maximum dimension of the action space, we need to pad the data to this dimension.
+    num_embodiment_domains: int = 32  # number of domains for the domain-aware linear layer
+
+    # sound configs
+    sound_gen: bool = False  # whether to use sound related parameters and condition/generate sound tokens
+    sound_tokenizer: LazyDict | None = None  # Sound tokenizer config (e.g., AVAE)
+    sound_dim: int | None = None  # Sound latent channel size (e.g., 64 for AVAE 48kHz)
+    sound_latent_fps: int = 25  # Sound tokenizer's latent rate (e.g., 48kHz / 1920 hop = 25 Hz)
+
+    # When False, removes bias from vae2llm, sound2llm, and the two Linear layers inside
+    # time_embedder.  These biases seem to inject token-constant DC offsets that dominate
+    # the MoE router input and create prompt invariant routing.  This is observed empirically
+    # in the 30B-A3B checkpoint.
+    enable_input_bias: bool = True
+
+    log_enc_time_every_n: int = 100  # Frequency of logging encoding time to W&B
+
+    # When True, ``OmniMoTModel.state_dict`` / ``load_state_dict`` skip the
+    # reasoner (und) pathway weights under ``language_model`` — i.e. every key
+    # WITHOUT a ``_moe_gen`` suffix (including ``visual`` / ``lm_head`` /
+    # ``embed_tokens``).  These are not written to checkpoints and are left
+    # untouched on load (typically already populated from the HF pretrained
+    # backbone).  Generation-pathway (``_moe_gen``) and VFM heads are saved /
+    # loaded as usual.
+    exclude_reasoner_weights_from_checkpoint: bool = False

@@ -1,0 +1,46 @@
+# Effect-v3 Zeva — RoboCasa Atomic-5.  Requires the baseline environment
+# plus ZEVA_TASK_CONTEXT_BANK and ZEVA_CTE_FEATURE_CACHE from the delivered CTE.
+
+[job]
+task = "vfm"
+experiment = "action_policy_robocasa365_atomic5_zeva"
+project = "zeva"
+group = "zeva_robocasa_atomic5"
+name = "zeva_robocasa_atomic5_smoke"
+wandb_mode = "disabled"
+
+[model]
+precision = "bfloat16"
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 1
+
+[model.activation_checkpointing]
+mode = "full"
+save_ops_regex = ["fmha"]
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH}"
+
+[optimizer]
+lr = 2.0e-4
+
+[scheduler]
+cycle_lengths = [100000]
+
+[dataloader_train]
+max_samples_per_batch = 16
+
+[trainer]
+max_iter = 20
+logging_iter = 1
+grad_accum_iter = 1
+
+[trainer.callbacks.compile_tokenizer]
+enabled = true
+warmup_resolutions = ["480"]
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
+save_iter = 20

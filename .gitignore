@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+.env
+outputs/
+checkpoints/
+pretrained/
+*.pt
+*.pth
+*.distcp
+*.safetensors
+*.mp4

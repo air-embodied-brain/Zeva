@@ -1,0 +1,46 @@
+# Frozen-policy PIM adapter. BASE_CHECKPOINT_PATH must be the verified GRU
+# Stage2 iter-5k DCP; only the Causal Prompt encoder, projector, and gate are optimized.
+
+[job]
+task = "vfm"
+experiment = "action_policy_robocasa365_atomic5_zeva_pim"
+project = "zeva"
+group = "pim_adapter_robocasa_atomic5"
+name = "pim_adapter_robocasa_atomic5_smoke"
+wandb_mode = "disabled"
+
+[model]
+precision = "bfloat16"
+
+[model.parallelism]
+data_parallel_shard_degree = 8
+data_parallel_replicate_degree = 1
+
+[model.activation_checkpointing]
+mode = "full"
+save_ops_regex = ["fmha"]
+
+[model.tokenizer]
+vae_path = "${oc.env:WAN_VAE_PATH}"
+
+[optimizer]
+lr = 5.0e-05
+
+[scheduler]
+cycle_lengths = [500]
+
+[dataloader_train]
+max_samples_per_batch = 8
+
+[trainer]
+max_iter = 500
+logging_iter = 1
+grad_accum_iter = 1
+
+[trainer.callbacks.compile_tokenizer]
+enabled = true
+warmup_resolutions = ["480"]
+
+[checkpoint]
+load_path = "${oc.env:BASE_CHECKPOINT_PATH}"
+save_iter = 100
