@@ -45,13 +45,13 @@ action_policy_robocasa365_atomic5_zeva_pim["checkpoint"]["keys_to_skip_loading"]
     "behavior_pim_gate",
 ]
 
-dataset = action_policy_robocasa365_atomic5_zeva_pim["dataloader_train"]["dataloader"]["datasets"][
-    "robocasa365"
-]["dataset"]
-dataset["behavior_pim_training_bank"] = "${oc.env:ZEVA_PIM_TRAINING_BANK}"
-dataset["behavior_pim_history_length"] = 4
-dataset["behavior_pim_context_dropout"] = 0.2
-dataset["behavior_pim_support_dropout"] = 0.2
+train_loader = action_policy_robocasa365_atomic5_zeva_pim.get("dataloader_train")
+if train_loader is not None:
+    dataset = train_loader["dataloader"]["datasets"]["robocasa365"]["dataset"]
+    dataset["behavior_pim_training_bank"] = "${oc.env:ZEVA_PIM_TRAINING_BANK}"
+    dataset["behavior_pim_history_length"] = 4
+    dataset["behavior_pim_context_dropout"] = 0.2
+    dataset["behavior_pim_support_dropout"] = 0.2
 
 cs.store(
     group="experiment",

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import time
 from collections import deque
@@ -12,7 +13,9 @@ from pathlib import Path
 
 import cv2
 import gymnasium as gym
+import msgpack_numpy
 import numpy as np
+import websockets.sync.client
 from openpi_client.websocket_client_policy import WebsocketClientPolicy
 
 import robocasa  # noqa: F401
@@ -71,6 +74,30 @@ TASK_PROMPTS = {
     "TurnOnMicrowave": "Press the start button on the microwave.",
     "CoffeeSetupMug": "Pick the mug from the counter and place it under the coffee machine dispenser.",
 }
+
+
+class _LongInferenceWebsocketClientPolicy(WebsocketClientPolicy):
+    """OpenPI client without a keepalive deadline during long GPU inference.
+
+    A normal request takes only a few seconds, but a temporarily contended GPU
+    can exceed websockets' 20-second keepalive timeout. The request itself is
+    synchronous and already bounded by the evaluator process, so disabling
+    protocol pings prevents a completed model outcome from being mislabeled as
+    an infrastructure failure.
+    """
+
+    def _wait_for_server(self):  # type: ignore[no-untyped-def, override]
+        logging.info("Waiting for server at %s...", self._uri)
+        headers = {"Authorization": f"Api-Key {self._api_key}"} if self._api_key else None
+        connection = websockets.sync.client.connect(
+            self._uri,
+            compression=None,
+            max_size=None,
+            additional_headers=headers,
+            ping_interval=None,
+        )
+        metadata = msgpack_numpy.unpackb(connection.recv())
+        return connection, metadata
 
 
 def _obs_value(obs: dict, *keys: str) -> np.ndarray:
@@ -193,11 +220,27 @@ def restore_session_from_artifacts(
     for record in records:
         artifact = np.load(output_dir / record["artifact_npz"])
         complete = [chunk for chunk in record["chunk_records"] if chunk["completed_16"]]
-        n = len(complete)
-        if artifact["phase"].shape[0] < n + 1:
-            raise ValueError(
-                "cannot restore a terminal complete chunk without its post-transition behavior features"
+        available = min(
+            int(artifact["phase"].shape[0]),
+            int(artifact["visual_key"].shape[0]),
+            int(artifact["latest_effect_post"].shape[0]),
+            int(artifact["latest_effect_valid"].shape[0]),
+        ) - 1
+        if len(complete) > available:
+            terminal_without_post = (
+                len(complete) == available + 1
+                and bool(record["success"])
+                and bool(complete[-1].get("terminal_chunk"))
             )
+            if not terminal_without_post:
+                raise ValueError(
+                    "cannot restore a complete chunk without its post-transition behavior features"
+                )
+            # A success exactly on a 16-control boundary has no next
+            # observation. It is not a valid transition-memory entry, but it
+            # remains part of the separately restored successful replay trace.
+            complete = complete[:available]
+        n = len(complete)
         actions = artifact["executed_actions"][: n * EXECUTED_ACTION_HORIZON].reshape(n, 16, 7)
         restored["phase"].extend(artifact["phase"][:n])
         restored["visual_key"].extend(artifact["visual_key"][:n])
@@ -365,7 +408,7 @@ def main() -> None:
     os.environ.setdefault("MUJOCO_GL", "egl")
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    client = WebsocketClientPolicy(args.host, args.port)
+    client = _LongInferenceWebsocketClientPolicy(args.host, args.port)
     results = []
     task_cluster = args.task_cluster or args.task
     base_session_id = args.pim_session_id or default_session_id(task_cluster, args.seed)

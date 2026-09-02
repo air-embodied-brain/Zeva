@@ -27,6 +27,7 @@ from cosmos_framework.inference.common.init import init_script
 
 init_script()
 
+import hashlib
 import json
 import socket
 import threading
@@ -38,6 +39,7 @@ import numpy as np
 import pydantic
 import torch
 import torch.nn.functional as F
+from torch import nn
 import tyro
 
 from cosmos_framework.data.generator.action.domain_utils import get_domain_id
@@ -50,6 +52,8 @@ from cosmos_framework.data.generator.action.pose_utils import (
 from cosmos_framework.data.generator.action.transforms import ActionTransformPipeline
 from cosmos_framework.data.generator.joint_dataloader import IterativeJointDataLoader
 from cosmos_framework.model.zeva import (
+    CausalPromptConfig,
+    CausalPromptEncoder,
     CausalTransitionEncoder,
     CausalTransitionEncoderConfig,
     StaticTaskContextRetrievalConfig,
@@ -411,6 +415,8 @@ class RobolabServerArgs(pydantic.BaseModel):
     """Task cluster whose offline transitions are deliberately supplied as wrong-task support."""
     pim_enabled: bool = False
     """Enable phase-conditioned Persistent Interaction Memory."""
+    pim_adapter_delta: Path | None = None
+    """Optional trained PIM-only delta loaded on top of the released Stage-2 checkpoint."""
     pim_shadow: bool = False
     """Build/query PIM but send empty PIM tensors to the model."""
     pim_capacity: int = 64
@@ -451,6 +457,7 @@ class RobolabPolicyService:
         self.pipe: OmniInference = pipe
         self.model = pipe.model
         self.model.eval()
+        self._load_pim_adapter_delta(args.pim_adapter_delta, args.checkpoint_path)
         assert isinstance(pipe.setup_args, OmniSetupArgs)
         self.setup_args: OmniSetupArgs = pipe.setup_args
         self._model_has_online_prefix = getattr(self.model.net, "behavior_online_projector", None) is not None
@@ -498,6 +505,85 @@ class RobolabPolicyService:
             f"image={self.cfg.image_height}x{self.cfg.image_width} fps={self.cfg.conditioning_fps} "
             f"guidance={self.cfg.guidance} num_steps={self.cfg.num_steps} shift={self.cfg.shift} "
             f"seed={self.cfg.seed} deterministic_seed={self.cfg.deterministic_seed}"
+        )
+
+    def _load_pim_adapter_delta(self, checkpoint: Path | None, base_checkpoint: str) -> None:
+        """Overlay the small trained PIM adapter without renaming model keys."""
+        if checkpoint is None:
+            return
+        if not checkpoint.is_file():
+            raise FileNotFoundError(checkpoint)
+        payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+        if payload.get("format") != "cosmos_behavior_pim_adapter_delta_v1":
+            raise ValueError(f"Unsupported PIM adapter delta format in {checkpoint}")
+        expected_base_hash = payload.get("base_metadata_sha256")
+        base_path = Path(base_checkpoint).expanduser()
+        if (base_path / "model").is_dir():
+            base_path = base_path / "model"
+        metadata_path = base_path / ".metadata"
+        if metadata_path.is_file() and expected_base_hash:
+            actual_base_hash = hashlib.sha256(metadata_path.read_bytes()).hexdigest()
+            if actual_base_hash != expected_base_hash:
+                raise ValueError(
+                    "PIM adapter delta was exported from a different Stage-2 checkpoint: "
+                    f"expected metadata {expected_base_hash}, got {actual_base_hash}"
+                )
+        state_dict = payload.get("state_dict")
+        if not isinstance(state_dict, dict) or not state_dict:
+            raise ValueError(f"PIM adapter delta has no state_dict: {checkpoint}")
+        net = self.model.net
+        if getattr(net, "behavior_pim_encoder", None) is None:
+            reference = next(net.parameters())
+            global_projector = getattr(net, "behavior_global_projector", None)
+            if global_projector is None:
+                raise ValueError("PIM adapter delta requires the released Zeva Stage-2 model")
+            global_dim = int(global_projector.in_features)
+            pim_dim = 256
+            net.behavior_pim_encoder = CausalPromptEncoder(
+                CausalPromptConfig(
+                    global_dim=global_dim,
+                    phase_dim=128,
+                    effect_dim=128,
+                    brief_length=4,
+                    persistent_length=4,
+                    hidden_dim=pim_dim,
+                    num_heads=4,
+                )
+            ).to(device=reference.device, dtype=reference.dtype)
+            net.behavior_pim_projector = nn.Linear(pim_dim, net.hidden_size, bias=True).to(
+                device=reference.device, dtype=reference.dtype
+            )
+            net.behavior_pim_gate = nn.Parameter(
+                torch.empty(1, device=reference.device, dtype=reference.dtype)
+            )
+            net.behavior_pim_gate_init = 0.0
+            net.behavior_pim_force_bypass = False
+            behavior_cfg = self.model.config.behavior_stage2
+            behavior_cfg.pim_memory_enabled = True
+            behavior_cfg.pim_persistent_length = 4
+            behavior_cfg.pim_context_dim = pim_dim
+            net.config.behavior_stage2_config.update(
+                pim_memory_enabled=True,
+                pim_persistent_length=4,
+                pim_context_dim=pim_dim,
+                pim_force_bypass=False,
+            )
+        model_keys = set(self.model.state_dict())
+        unexpected = sorted(set(state_dict) - model_keys)
+        if unexpected:
+            raise ValueError(
+                "PIM adapter delta does not match the configured model; "
+                f"unexpected keys: {unexpected[:5]}"
+            )
+        incompatible = self.model.load_state_dict(state_dict, strict=False)
+        if incompatible.unexpected_keys:
+            raise ValueError(
+                "PIM adapter delta produced unexpected model keys: "
+                f"{incompatible.unexpected_keys[:5]}"
+            )
+        log.info(
+            "[robolab-policy-server] loaded PIM adapter delta "
+            f"path={checkpoint} tensors={len(state_dict)} format={payload['format']}"
         )
 
     def _init_transition_memory(self, args: RobolabServerArgs) -> None:
