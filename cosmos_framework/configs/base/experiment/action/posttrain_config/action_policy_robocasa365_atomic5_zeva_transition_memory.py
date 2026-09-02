@@ -51,12 +51,12 @@ action_policy_robocasa365_atomic5_zeva_transition_memory["optimizer"]["lr_multip
     behavior_online_projector=5.0,
 )
 
-dataset = action_policy_robocasa365_atomic5_zeva_transition_memory["dataloader_train"]["dataloader"]["datasets"][
-    "robocasa365"
-]["dataset"]
-dataset["behavior_memory_bank"] = "${oc.env:ZEVA_TASK_CONTEXT_BANK}"
-dataset["behavior_phase_cache"] = "${oc.env:ZEVA_CTE_FEATURE_CACHE}"
-dataset["behavior_online_context_cache"] = "${oc.env:ZEVA_TRANSITION_CONTEXT_CACHE}"
+train_loader = action_policy_robocasa365_atomic5_zeva_transition_memory.get("dataloader_train")
+if train_loader is not None:
+    dataset = train_loader["dataloader"]["datasets"]["robocasa365"]["dataset"]
+    dataset["behavior_memory_bank"] = "${oc.env:ZEVA_TASK_CONTEXT_BANK}"
+    dataset["behavior_phase_cache"] = "${oc.env:ZEVA_CTE_FEATURE_CACHE}"
+    dataset["behavior_online_context_cache"] = "${oc.env:ZEVA_TRANSITION_CONTEXT_CACHE}"
 
 cs.store(
     group="experiment",

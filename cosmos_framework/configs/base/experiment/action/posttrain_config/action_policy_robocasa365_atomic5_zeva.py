@@ -43,6 +43,10 @@ action_policy_robocasa365_atomic5_zeva["model"]["config"]["proprio_condition"] =
     input_dim=9,
     prefix_tokens=1,
 )
+# This is a post-trained Zeva checkpoint, not a fresh DROID initialization.
+# Load every trained policy/action tensor; only the unused EMA namespace may be
+# absent. Inheriting DROID's action-head skip list silently changes inference.
+action_policy_robocasa365_atomic5_zeva["checkpoint"]["keys_to_skip_loading"] = ["net_ema."]
 # The server supplies Qwen explicitly; retain the same environment contract as
 # the training recipe so checkpoint metadata and manual startup agree.
 action_policy_robocasa365_atomic5_zeva["model"]["config"]["vlm_config"]["tokenizer"][
