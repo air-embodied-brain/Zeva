@@ -1,0 +1,39 @@
+{
+  "schema": "zeva-robotwin-training-v1",
+  "parent": {
+    "components": ["CTE", "BIT", "EAP"],
+    "steps": 5000,
+    "global_batch": 256,
+    "foundation_lr": 0.000005,
+    "eap_lr": 0.00005,
+    "entrypoint": "scripts/robotwin/train_cte_eap.py"
+  },
+  "pim": {
+    "cross_attempt": {
+      "memory_scope": "completed attempts in the current episode",
+      "read": "empty on the first attempt; later attempts read committed BIT traces",
+      "write": "commit the current BIT trace at attempt reset",
+      "reset": "clear at episode reset",
+      "steps": 2000,
+      "warmup_steps": 500,
+      "global_batch": 256,
+      "foundation_lr_after_warmup": 0.000001,
+      "eap_lr_after_warmup": 0.00001,
+      "pim_lr": 0.00005,
+      "artifact_builder": "scripts/robotwin/build_cross_attempt_pim.py",
+      "entrypoint": "scripts/robotwin/train_cross_attempt_pim.py"
+    },
+    "within_episode": {
+      "memory_scope": "strictly earlier H15 boundaries in the current episode",
+      "read": "read PIM[0:t) before predicting boundary t",
+      "write": "append the detached current BIT after action prediction",
+      "reset": "clear at episode reset",
+      "steps": 2000,
+      "global_batch": 256,
+      "pim_lr": 0.00005,
+      "capacity": 64,
+      "frozen": ["CTE", "BIT", "task_memory", "language_retrieval", "foundation_policy", "EAP"],
+      "entrypoint": "scripts/robotwin/train_within_episode_pim.py"
+    }
+  }
+}

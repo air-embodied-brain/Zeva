@@ -1,0 +1,9 @@
+{
+  "protocol": "robotwin-randomized-seen-v1",
+  "checkpoint": "/path/to/post_trained_checkpoint",
+  "split": "demo_randomized",
+  "instruction_protocol": "seen",
+  "episodes_per_task": 100,
+  "first_seed": 1000,
+  "replan_horizon": 15
+}

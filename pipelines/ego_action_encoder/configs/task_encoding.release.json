@@ -1,0 +1,72 @@
+{
+  "schema": "zeva-ego-task-encoding-training-v1",
+  "data": {
+    "sources": ["ego", "robot"],
+    "sampling": "equal-source-homogeneous-batches",
+    "triplet_layout": "frames-a-b-c",
+    "allowed_image_sizes": [[196, 350], [210, 280]]
+  },
+  "vision": {
+    "repository": "facebookresearch/dinov2",
+    "repository_ref": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+    "model_name": "dinov2_vitb14_reg",
+    "image_height": 196,
+    "image_width": 350,
+    "patch_size": 14,
+    "feature_dim": 768
+  },
+  "model": {
+    "visual_dim": 768,
+    "model_dim": 768,
+    "latent_dim": 128,
+    "num_environment_tokens": 4,
+    "num_task_tokens": 16,
+    "encoder_blocks": 12,
+    "decoder_blocks": 12,
+    "num_heads": 12,
+    "dropout": 0.0,
+    "environment_mode": "joint_query_v1",
+    "normalize_environment_tokens": true
+  },
+  "loss": {
+    "reconstruction_weight": 1.0,
+    "environment_consistency_weight": 1.0,
+    "additive_weight": 0.0,
+    "reversal_weight": 0.0,
+    "contrastive_weight": 0.0,
+    "ranking_weight": 0.01,
+    "ranking_mode": "neighborhood_kl_same_duration_v1",
+    "ranking_margin": 0.0,
+    "action_translation_distance_scale": 0.0003952162805944681,
+    "action_rotation_distance_scale": 0.01493814866989851,
+    "action_gripper_distance_scale": 0.013550070114433765,
+    "action_neighborhood_temperature_by_horizon": [1.0, 1.0, 1.0, 1.0, 1.0, 0.008067266549914836, 0.011070895474404305, 0.014521094504743407, 0.01893718261271693, 0.021242403425276175, 0.027033113874494617, 0.02825692575424815, 0.032692836597560934, 0.041698040440680005, 0.0467552375048403, 0.05278064124286108, 0.05222903005778796, 0.0678358040750013, 0.07225492224097255, 0.07470414415002116, 0.09075618907809362, 0.08823300525546271, 0.10152197256683931, 0.10020003095269077, 0.11824716255068411, 0.13516832143068278, 0.13379583507775872, 0.12638812512159714, 0.11740233376621995, 0.15969962626695958, 0.16207674890756982],
+    "token_neighborhood_temperature_by_horizon": [1.0, 1.0, 1.0, 1.0, 1.0, 0.01094292476773262, 0.01213579811155796, 0.012328938581049442, 0.012568308040499687, 0.014392456039786339, 0.012893237173557281, 0.013786278665065765, 0.014257710427045822, 0.01451085414737463, 0.014577156864106655, 0.014858567155897617, 0.01445032749325037, 0.015514307655394077, 0.01639529876410961, 0.015664586797356606, 0.018482374027371407, 0.017405005171895027, 0.017455395311117172, 0.017784539610147476, 0.01941077969968319, 0.019560711458325386, 0.020734136924147606, 0.02042071707546711, 0.021570654585957527, 0.02070331759750843, 0.02064807340502739],
+    "neighborhood_row_chunk_size": 64,
+    "neighborhood_target_effective_neighbours": 32.0
+  },
+  "optimization": {
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "betas": [0.9, 0.95],
+    "epsilon": 1e-8,
+    "gradient_clip_norm": 0.1,
+    "warmup_steps": 500,
+    "minimum_learning_rate_ratio": 0.1
+  },
+  "runtime": {
+    "output_dir": "outputs/zeva-ego/task-encoding",
+    "steps": 40000,
+    "expected_world_size": 16,
+    "per_device_batch_size": 256,
+    "gradient_accumulation_steps": 1,
+    "workers": 4,
+    "seed": 20260729,
+    "precision": "bfloat16",
+    "device": "cuda",
+    "attention_backend": "sdpa",
+    "activation_checkpointing": true,
+    "log_every_steps": 10,
+    "checkpoint_every_steps": 1000
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schema": "zeva-ego-environment-encoding-training-v1",
+  "data": {
+    "sources": ["ego", "robot"],
+    "sampling": "equal-source",
+    "action_representation": "first-frame-camera-relative",
+    "allowed_image_sizes": [[196, 350], [210, 280]]
+  },
+  "vision": {
+    "repository": "facebookresearch/dinov2",
+    "repository_ref": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+    "model_name": "dinov2_vitb14_reg",
+    "image_height": 196,
+    "image_width": 350,
+    "patch_size": 14,
+    "feature_dim": 768
+  },
+  "model": {
+    "visual_dim": 768,
+    "action_dim": 44,
+    "model_dim": 768,
+    "latent_dim": 128,
+    "num_environment_tokens": 4,
+    "codebook_size": null,
+    "encoder_blocks": 12,
+    "decoder_blocks": 12,
+    "num_heads": 12,
+    "dropout": 0.0,
+    "code_restart": false,
+    "normalize_bottleneck": true,
+    "camera_motion_max_steps": 30,
+    "action_endpoint_adversary": false
+  },
+  "loss": {
+    "vq_beta": 0.25,
+    "camera_motion_weight": 0.1,
+    "action_endpoint_adversary_weight": 0.0,
+    "action_endpoint_hsic_weight": 0.05,
+    "action_endpoint_hsic_max_samples": 1024,
+    "action_endpoint_hsic_kernel_scales": [0.5, 1.0, 2.0],
+    "bottleneck_variance_weight": 1.0,
+    "bottleneck_variance_floor": 0.05
+  },
+  "optimization": {
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "betas": [0.9, 0.95],
+    "epsilon": 1e-8,
+    "gradient_clip_norm": 0.05,
+    "warmup_steps": 500,
+    "minimum_learning_rate_ratio": 0.1
+  },
+  "runtime": {
+    "output_dir": "outputs/zeva-ego/environment-encoding",
+    "steps": 20000,
+    "expected_world_size": 8,
+    "per_device_batch_size": 512,
+    "gradient_accumulation_steps": 4,
+    "workers": 4,
+    "seed": 20260722,
+    "precision": "bfloat16",
+    "device": "cuda",
+    "attention_backend": "sdpa",
+    "activation_checkpointing": true,
+    "log_every_steps": 10,
+    "checkpoint_every_steps": 1000
+  }
+}
