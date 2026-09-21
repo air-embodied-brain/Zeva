@@ -1,3 +1,10 @@
+## News
+
+- **[2026-09-21]** [**Zeva-Ego**](https://air-embodied-brain.github.io/Zeva-Ego/) is released!（code is on the branch feature/zeva_ego）
+
+- **[2026-09-03]** The [**Zeva RoboCasa checkpoint**](https://huggingface.co/chen123fu/zeva-robocasa) is now available.
+
+- **[2026-09-01]** [**Zeva**](https://air-embodied-brain.github.io/Zeva/) is released!
 # zeva
 
 **In-Context Causal Learning for Generalizable Embodied Manipulation**
