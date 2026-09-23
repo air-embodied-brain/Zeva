@@ -23,8 +23,13 @@
     .abstract-wrap{max-width:920px;}
     .abstract-section h2.sec{margin-bottom:1.35rem;}
     .abstract-copy{font-size:1.04rem;line-height:1.9;color:#3f4857;letter-spacing:.002em;}
+    .overview-video-section{background:linear-gradient(180deg,#fff 0%,var(--bg-soft) 100%);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+    .overview-video-wrap{max-width:1040px;}
+    .overview-video-card{margin:2rem auto 0;border:1px solid var(--line);border-radius:18px;background:#101522;box-shadow:0 18px 42px rgba(20,30,50,.1);overflow:hidden;}
+    .overview-video-card video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;background:linear-gradient(135deg,#0d1220 0%,#171d2d 100%);}
+    .overview-video-caption{margin:0;padding:1rem 1.25rem;color:var(--muted);font-size:.92rem;line-height:1.7;text-align:center;border-top:1px solid var(--line);background:#fff;}
+    .section-intro{max-width:880px;text-align:left;}
     .demo-section{background:#fff;border-bottom:1px solid var(--line);}
-    .demo-section .section-intro{max-width:880px;text-align:left;}
     .method-section{background:linear-gradient(180deg,var(--accent-faint) 0%,#fff 100%);border-bottom:1px solid var(--line);}
     .hero-head{position:relative;overflow:hidden;background:linear-gradient(180deg,#eef2ff 0%,#fff 100%);border-bottom:1px solid var(--line);text-align:center;padding-top:4.5rem;padding-bottom:3.15rem;}
     .hero-dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
@@ -177,6 +182,18 @@
       <div class="stat"><div class="num">83.3%</div><div class="lab">Avg. success on ChemLab-Evo Level-1 real robot tasks</div></div>
       <div class="stat"><div class="num">100%</div><div class="lab">Pick Up Test Tube SR on ChemLab-Evo<br>(20 randomized episodes)</div></div>
     </div>
+  </div>
+</section>
+<section class="section overview-video-section" id="overview-video">
+  <div class="container overview-video-wrap">
+    <h2 class="sec">Overview Video</h2>
+    <p class="lead section-intro">A short visual summary of Zeva, showing how interaction memory supports post-deployment improvement with a frozen policy.</p>
+    <figure class="overview-video-card">
+      <video controls preload="auto" playsinline aria-label="Zeva overview video">
+        <source src="https://fe-1301391939.cos.ap-shanghai.myqcloud.com/zeva/zeva.mp4" type="video/mp4">
+      </video>
+      <figcaption class="overview-video-caption">Zeva learns from the robot's own physical interactions during deployment while keeping all model weights unchanged.</figcaption>
+    </figure>
   </div>
 </section>
 <section class="section abstract-section">
