@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="interactions.css">
+  <script src="interactions.js" defer></script>
   <title>Zeva: In-Context Causal Learning for Generalizable Embodied Manipulation</title>
   <meta name="description" content="Zeva is a frozen-policy embodied AI framework that accumulates causal interaction memory from real-world attempts and uses it to keep improving without any gradient updates.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,6 +33,17 @@
     .section-intro{max-width:880px;text-align:left;}
     .demo-section{background:#fff;border-bottom:1px solid var(--line);}
     .method-section{background:linear-gradient(180deg,var(--accent-faint) 0%,#fff 100%);border-bottom:1px solid var(--line);}
+    .method-flow{margin:2.5rem 0 0;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#fff;box-shadow:var(--shadow);}
+    .method-flow-heading{padding:1.4rem 1.5rem 1.15rem;}
+    .method-flow-heading h3{margin:0 0 .45rem;font-size:1.2rem;line-height:1.4;letter-spacing:-.015em;}
+    .method-flow-heading p{margin:0;color:var(--muted);font-size:.94rem;line-height:1.75;}
+    .method-flow video{display:block;width:100%;height:auto;aspect-ratio:2/1;object-fit:contain;background:#1b1b30;}
+    .method-flow video:focus-visible{outline:3px solid var(--accent);outline-offset:-3px;}
+    .method-flow figcaption{padding:1rem 1.5rem;color:var(--muted);font-size:.88rem;line-height:1.7;border-top:1px solid var(--line);}
+    .method-flow figcaption strong{color:var(--ink);font-weight:600;}
+    .method-flow-note{display:block;margin-top:.4rem;font-size:.82rem;}
+    .method-flow-note a{color:var(--accent);text-underline-offset:3px;}
+    @media(max-width:620px){.method-flow{margin-top:1.75rem;border-radius:12px;}.method-flow-heading{padding:1.1rem;}.method-flow figcaption{padding:.9rem 1.1rem;}}
     .hero-head{position:relative;overflow:hidden;background:linear-gradient(180deg,#eef2ff 0%,#fff 100%);border-bottom:1px solid var(--line);text-align:center;padding-top:4.5rem;padding-bottom:3.15rem;}
     .hero-dots{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
     .hero-head .container{position:relative;z-index:1;}
@@ -244,6 +257,19 @@
       <div class="card"><span class="tag">Stage 2</span><h4>Dual-timescale Causal Memory</h4><p>A Brief Interaction Trace (BIT) captures recent within-attempt dynamics; a Persistent Interaction Memory (PIM) consolidates cross-attempt evidence within the same episode through similarity-based merging.</p></div>
       <div class="card"><span class="tag">Stage 3</span><h4>In-Context Policy Injection</h4><p>Zeva retrieves phase-matched interaction evidence and constructs a Causal Prompt for the frozen foundation policy. During deployment, all parameters remain frozen; only the memories are updated online.</p></div>
     </div>
+    <figure class="method-flow" aria-labelledby="method-flow-title">
+      <div class="method-flow-heading">
+        <h3 id="method-flow-title">Causal Guidance in Motion</h3>
+        <p>A flow-field visualization comparing standard Flow Matching with Zeva's causal-memory-guided dynamics.</p>
+      </div>
+      <video controls preload="metadata" playsinline width="1600" height="800" aria-label="Flow-field comparison: standard Flow Matching and Zeva" aria-describedby="method-flow-caption">
+        <source src="https://fe-1301391939.cos.ap-shanghai.myqcloud.com/zeva/flow.mp4#t=0.1" type="video/mp4">
+        Your browser does not support embedded video. <a href="https://fe-1301391939.cos.ap-shanghai.myqcloud.com/zeva/flow.mp4" target="_blank" rel="noopener noreferrer">Watch the flow-field visualization</a>.
+      </video>
+      <figcaption id="method-flow-caption"><strong>Left:</strong> standard Flow Matching, without causal guidance. <strong>Right:</strong> Zeva adds causal guidance to the base flow; the dashed green region marks causal memory in this visualization.
+        <span class="method-flow-note">Illustrative dynamics, not a robot rollout. Use full screen to inspect the trajectories, or <a href="https://fe-1301391939.cos.ap-shanghai.myqcloud.com/zeva/flow.mp4" target="_blank" rel="noopener noreferrer">open the video in a new tab</a>.</span>
+      </figcaption>
+    </figure>
   </div>
 </section>
 <section class="section soft" id="capability-scaling">
