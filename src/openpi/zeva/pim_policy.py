@@ -1,27 +1,27 @@
-"""Persistent interaction memory variants for ZeVA CTE + BIT + EAP.
+"""Cross-attempt Persistent Interaction Memory for ZeVA CTE + BIT + EAP."""
 
-The within-episode policy treats BIT as short-term boundary state and PIM as a
-causal long-term history of earlier BITs. The cross-attempt variant commits a
-completed attempt's BIT trace and exposes it to the next attempt.
-"""
 from __future__ import annotations
 
 import hashlib
+import math
 from pathlib import Path
 
 from safetensors.torch import load_model
 import torch
 from torch import nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 
-from openpi.zeva.cte_eap import SCHEMA, ZevaEffectActionPrior
-from openpi.zeva.cte_eap_policy import ZevaCTEEAPPolicy, file_sha, load_cte
+from openpi.zeva.cte_eap import SCHEMA
+from openpi.zeva.cte_eap import ZevaEffectActionPrior
+from openpi.zeva.cte_eap_policy import ZevaCTEEAPPolicy
+from openpi.zeva.cte_eap_policy import file_sha
+from openpi.zeva.cte_eap_policy import load_cte
 from openpi.zeva.robotwin_contract import ROBOTWIN_CAMERA_KEYS
-
 
 PIM_POLICY_SCHEMA = "zeva-cte-eap-pim-v1"  # Legacy checkpoint schema.
 CROSS_ATTEMPT_PIM_POLICY_SCHEMA = PIM_POLICY_SCHEMA
 EPISODE_PIM_POLICY_SCHEMA = "zeva-cte-bit-episode-pim-eap-v1"
+DEFAULT_PIM_COMPRESSION = "similarity_merge"
 
 
 def directory_checkpoint_sha(path: str | Path) -> str:
@@ -47,13 +47,32 @@ class AttemptPersistentMemory:
     never leaves a partially retained attempt.
     """
 
-    def __init__(self, *, max_attempts: int = 4, max_entries_per_attempt: int = 64):
+    def __init__(
+        self,
+        *,
+        max_attempts: int = 4,
+        max_entries_per_attempt: int = 64,
+        compression: str = DEFAULT_PIM_COMPRESSION,
+        merge_threshold: float = 0.95,
+        phase_weight: float = 0.5,
+    ):
         if max_attempts <= 0 or max_entries_per_attempt <= 0:
             raise ValueError("PIM capacities must be positive.")
+        if compression not in {"uniform", "similarity_merge"}:
+            raise ValueError("PIM compression must be uniform or similarity_merge.")
+        if not math.isfinite(merge_threshold) or not -1 <= merge_threshold <= 1:
+            raise ValueError("PIM merge threshold must be finite and in [-1,1].")
+        if not math.isfinite(phase_weight) or not 0 <= phase_weight <= 1:
+            raise ValueError("PIM phase weight must be finite and in [0,1].")
         self.max_attempts = int(max_attempts)
         self.max_entries_per_attempt = int(max_entries_per_attempt)
+        self.compression = compression
+        self.merge_threshold = float(merge_threshold)
+        self.phase_weight = float(phase_weight)
         self._bit: list[tuple[torch.Tensor, torch.Tensor]] = []
         self._attempts: list[tuple[torch.Tensor, torch.Tensor]] = []
+        self._counts: list[torch.Tensor] = []
+        self._merged: tuple[torch.Tensor, torch.Tensor] | None = None
 
     @staticmethod
     def _batch_one(value: torch.Tensor, name: str) -> torch.Tensor:
@@ -73,15 +92,45 @@ class AttemptPersistentMemory:
             return torch.arange(length, device=device)
         return torch.linspace(0, length - 1, keep, device=device).round().long().unique()
 
+    def _merge_similar(self, phases, bits, counts):
+        """Merge by phase/effect cosine similarity, retaining weighted centroids."""
+        merged_phase, merged_bit, merged_count = [], [], []
+        for phase, bit, count in zip(phases, bits, counts, strict=True):
+            if merged_phase:
+                phase_scores = F.cosine_similarity(torch.stack(merged_phase).float(), phase.float()[None])
+                bit_scores = F.cosine_similarity(torch.stack(merged_bit).float(), bit.float()[None])
+                scores = self.phase_weight * phase_scores + (1 - self.phase_weight) * bit_scores
+                best = int(scores.argmax())
+                if float(scores[best]) >= self.merge_threshold:
+                    total = merged_count[best] + count
+                    merged_phase[best] = (merged_phase[best] * merged_count[best] + phase * count) / total
+                    merged_bit[best] = (merged_bit[best] * merged_count[best] + bit * count) / total
+                    merged_count[best] = total
+                    continue
+            merged_phase.append(phase.clone())
+            merged_bit.append(bit.clone())
+            merged_count.append(count.clone())
+        return torch.stack(merged_phase), torch.stack(merged_bit), torch.stack(merged_count)
+
     def commit_attempt(self) -> bool:
         """Move the completed attempt's BIT trace into PIM."""
         if not self._bit:
             return False
         phases = torch.stack([item[0] for item in self._bit])
         bits = torch.stack([item[1] for item in self._bit])
+        counts = torch.ones(len(phases), device=phases.device)
+        if self.compression == "similarity_merge":
+            phases, bits, counts = self._merge_similar(phases, bits, counts)
         indices = self._uniform_indices(len(phases), self.max_entries_per_attempt, phases.device)
         self._attempts.append((phases[indices], bits[indices]))
-        del self._attempts[:-self.max_attempts]
+        self._counts.append(counts[indices])
+        del self._attempts[: -self.max_attempts]
+        del self._counts[: -self.max_attempts]
+        if self.compression == "similarity_merge":
+            phases = torch.cat([item[0] for item in self._attempts])
+            bits = torch.cat([item[1] for item in self._attempts])
+            phases, bits, _ = self._merge_similar(phases, bits, torch.cat(self._counts))
+            self._merged = (phases.unsqueeze(0), bits.unsqueeze(0))
         self._bit.clear()
         return True
 
@@ -93,10 +142,14 @@ class AttemptPersistentMemory:
     def reset_episode(self) -> None:
         self._bit.clear()
         self._attempts.clear()
+        self._counts.clear()
+        self._merged = None
 
     def entries(self) -> tuple[torch.Tensor | None, torch.Tensor | None]:
         if not self._attempts:
             return None, None
+        if self.compression == "similarity_merge":
+            return self._merged
         phases = torch.cat([item[0] for item in self._attempts]).unsqueeze(0)
         bits = torch.cat([item[1] for item in self._attempts]).unsqueeze(0)
         return phases, bits
@@ -105,7 +158,9 @@ class AttemptPersistentMemory:
         return {
             "bit_entries": len(self._bit),
             "pim_attempts": len(self._attempts),
-            "pim_entries": sum(len(item[0]) for item in self._attempts),
+            "pim_entries": (
+                self._merged[0].shape[1] if self._merged is not None else sum(len(item[0]) for item in self._attempts)
+            ),
         }
 
 
@@ -124,10 +179,10 @@ class EpisodePersistentMemory:
         self._entries: list[tuple[torch.Tensor, torch.Tensor]] = []
 
     def append_bit(self, phase: torch.Tensor, bit: torch.Tensor) -> None:
-        phase_value = AttemptPersistentMemory._batch_one(phase, "phase")
-        bit_value = AttemptPersistentMemory._batch_one(bit, "BIT")
+        phase_value = AttemptPersistentMemory._batch_one(phase, "phase")  # noqa: SLF001
+        bit_value = AttemptPersistentMemory._batch_one(bit, "BIT")  # noqa: SLF001
         self._entries.append((phase_value, bit_value))
-        del self._entries[:-self.max_entries]
+        del self._entries[: -self.max_entries]
 
     def reset_episode(self) -> None:
         self._entries.clear()
@@ -153,9 +208,7 @@ class ZevaPIMEAP(ZevaEffectActionPrior):
         self.pim_query = nn.Linear(dim, dim, bias=False)
         self.pim_projector = nn.Linear(dim, prefix_dim)
         self.pim_to_global = nn.Linear(dim, dim)
-        # PIM starts as a conservative addition to the already trained EAP.
-        # The prefix path remains trainable on the first update; the EAP mean
-        # path is initially unchanged and opens during Stage2 fine-tuning.
+        # The PIM prefix is trainable immediately; its prior-mean residual starts at zero.
         nn.init.normal_(self.pim_projector.weight, std=0.002)
         nn.init.zeros_(self.pim_projector.bias)
         nn.init.zeros_(self.pim_to_global.weight)
@@ -215,13 +268,29 @@ class ZevaPIMEAP(ZevaEffectActionPrior):
 
 
 class ZevaPIMPolicy(ZevaCTEEAPPolicy):
-    """Stage2-only PIM extension initialized from a trained CTE+EAP policy."""
+    """Cross-attempt PIM policy loaded from a standalone inference package."""
 
     POLICY_SCHEMA = CROSS_ATTEMPT_PIM_POLICY_SCHEMA
     ACTION_PRIOR_CLASS = ZevaPIMEAP
 
-    def __init__(self, loader, cte, bank, retrieval, *, max_attempts: int = 4):
+    def __init__(
+        self,
+        loader,
+        cte,
+        bank,
+        retrieval,
+        *,
+        max_attempts: int = 4,
+        compression: str = DEFAULT_PIM_COMPRESSION,
+        merge_threshold: float = 0.95,
+        phase_weight: float = 0.5,
+    ):
         self._max_attempts = max_attempts
+        self._pim_options = {
+            "compression": compression,
+            "merge_threshold": merge_threshold,
+            "phase_weight": phase_weight,
+        }
         super().__init__(loader, cte, bank, retrieval)
 
     @classmethod
@@ -235,14 +304,15 @@ class ZevaPIMPolicy(ZevaCTEEAPPolicy):
         parent_stage2_checkpoint,
         *,
         device="cuda",
+        exploratory_epoch40=False,
     ):
         """Create a new PIM policy from the already validated Stage2 parent."""
-        from openpi.zeva.robotwin_policy import RobotWinZevaPolicy
+        from openpi.zeva.robotwin_policy import RobotWinZevaPolicy  # noqa: PLC0415
 
         bank = torch.load(artifacts, map_location="cpu", weights_only=False)
         if bank["cte_sha256"] != file_sha(cte_checkpoint):
             raise ValueError("CTE and task memory SHA differ.")
-        cte = load_cte(cte_checkpoint, device)
+        cte = load_cte(cte_checkpoint, device, exploratory_epoch40=exploratory_epoch40)
         loader = RobotWinZevaPolicy.from_handoff(
             handoff,
             foundation_checkpoint=foundation_checkpoint,
@@ -279,6 +349,7 @@ class ZevaPIMPolicy(ZevaCTEEAPPolicy):
             "foundation_sha256": file_sha(Path(foundation_checkpoint) / "model.safetensors"),
             "parent_stage2_sha256": directory_checkpoint_sha(parent),
         }
+        policy.foundation.requires_grad_(requires_grad=True)
         return policy.eval()
 
     @classmethod
@@ -292,11 +363,13 @@ class ZevaPIMPolicy(ZevaCTEEAPPolicy):
         stage2_checkpoint,
         *,
         device="cuda",
+        exploratory_epoch40=False,
+        memory_options=None,
     ):
-        from openpi.zeva.robotwin_policy import RobotWinZevaPolicy
+        from openpi.zeva.robotwin_policy import RobotWinZevaPolicy  # noqa: PLC0415
 
         bank = torch.load(artifacts, map_location="cpu", weights_only=False)
-        cte = load_cte(cte_checkpoint, device)
+        cte = load_cte(cte_checkpoint, device, exploratory_epoch40=exploratory_epoch40)
         loader = RobotWinZevaPolicy.from_handoff(
             handoff,
             foundation_checkpoint=foundation_checkpoint,
@@ -305,7 +378,7 @@ class ZevaPIMPolicy(ZevaCTEEAPPolicy):
             device=device,
         )
         retrieval = torch.load(retrieval_checkpoint, map_location="cpu", weights_only=False)
-        policy = cls(loader, cte, bank, retrieval).to(device)
+        policy = cls(loader, cte, bank, retrieval, **(memory_options or {})).to(device)
         folder = Path(stage2_checkpoint)
         adapter = torch.load(folder / "zeva_adapter.pth", map_location=device, weights_only=False)
         identity = adapter.get("identity", {})
@@ -321,13 +394,23 @@ class ZevaPIMPolicy(ZevaCTEEAPPolicy):
         policy.eap.load_state_dict(adapter["eap"], strict=True)
         load_model(policy.foundation, str(folder / "model.safetensors"), strict=True)
         policy.identity = identity
+        policy.foundation.requires_grad_(requires_grad=True)
         return policy.eval()
+
+    @classmethod
+    def from_release(cls, root, *, device="cuda", memory_options=None):
+        """Load the standalone cross-attempt PIM inference package."""
+        from openpi.zeva.pim_release import load_release  # noqa: PLC0415
+
+        if cls.POLICY_SCHEMA != CROSS_ATTEMPT_PIM_POLICY_SCHEMA:
+            raise ValueError("This release contains cross-attempt PIM, not within-episode PIM.")
+        return load_release(Path(root), device=device, memory_options=memory_options)
 
     def reset(self, *, scope="episode"):
         if scope not in {"attempt", "episode"}:
             raise ValueError("PIM policy reset scope must be 'attempt' or 'episode'.")
         if not hasattr(self, "pim"):
-            self.pim = AttemptPersistentMemory(max_attempts=self._max_attempts)
+            self.pim = AttemptPersistentMemory(max_attempts=self._max_attempts, **self._pim_options)
         if scope == "attempt":
             self.pim.reset_attempt()
         else:
@@ -380,7 +463,9 @@ class ZevaPIMPolicy(ZevaCTEEAPPolicy):
                     mode="bilinear",
                     align_corners=False,
                     antialias=True,
-                ).mul(2).sub(1)
+                )
+                .mul(2)
+                .sub(1)
                 for key in ROBOTWIN_CAMERA_KEYS
             ],
             dim=1,
@@ -440,9 +525,14 @@ class ZevaEpisodePIMPolicy(ZevaPIMPolicy):
         views = torch.stack(
             [
                 F.interpolate(
-                    processed[key].float(), (224, 224), mode="bilinear",
-                    align_corners=False, antialias=True,
-                ).mul(2).sub(1)
+                    processed[key].float(),
+                    (224, 224),
+                    mode="bilinear",
+                    align_corners=False,
+                    antialias=True,
+                )
+                .mul(2)
+                .sub(1)
                 for key in ROBOTWIN_CAMERA_KEYS
             ],
             dim=1,
@@ -453,8 +543,12 @@ class ZevaEpisodePIMPolicy(ZevaPIMPolicy):
             self._global_token = self.memory(self.language(task))
         pim_phase, pim_bit = self.pim.entries()
         self.eap.activate(
-            self._global_token, phase, bit,
-            pim_phase=pim_phase, pim_bit=pim_bit, include_pim=include_pim,
+            self._global_token,
+            phase,
+            bit,
+            pim_phase=pim_phase,
+            pim_bit=pim_bit,
+            include_pim=include_pim,
         )
         try:
             actions = self.foundation.predict_action_chunk(processed)
@@ -465,5 +559,4 @@ class ZevaEpisodePIMPolicy(ZevaPIMPolicy):
         return actions
 
 
-# Explicit names for the two supported PIM scopes.
 ZevaCrossAttemptPIMPolicy = ZevaPIMPolicy
