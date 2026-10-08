@@ -1,90 +1,51 @@
 # Zeva-Ego
 
-Zeva-Ego is a memory-augmented vision-language-action stack for RoboTwin and real-robot manipulation. The public release focuses on method implementation and training reproducibility.
-
+Zeva-Ego provides an egocentric visual action encoder, memory-augmented RoboTwin policies, and real-robot integration utilities.
 [![Zeva-Ego overview](assets/zeva_ego_teaser.png)](assets/zeva_ego_teaser.pdf)
 
 ## Method
 
-Zeva-Ego adds four components to a foundation policy:
+- **CTE — Causal Transition Encoder:** a three-stream Mamba backbone encodes camera observations and previously executed actions.
+- **BIT — Brief Interaction Trace:** short-term interaction history within the current attempt.
+- **PIM — Persistent Interaction Memory:** preserves completed attempts' BITs for later attempts in the same episode.
+- **EAP — Effect Action Prior:** conditions the foundation policy on task memory and interaction effects.
 
-- **CTE — Causal Transition Encoder:** recurrently encodes camera observations and the previously executed H15 action chunk.
-- **BIT — Boundary Interaction Token:** the short-term state produced at the current replanning boundary.
-- **EAP — Effect Action Prior:** injects task memory and the predicted effect into the policy prefix and action embeddings.
-- **PIM — Persistent Interaction Memory:** retrieves longer-horizon BIT history.
+## Ego encoder and independent pipelines
 
-Two PIM scopes are implemented:
+- [Ego action encoder](pipelines/ego_action_encoder/README.md): the two-stage visual action encoder, including models, training recipes, dataset contracts, checkpoints, tests, and RGB-pair inference.
+- [RoboTwin Clean](pipelines/robotwin_clean/README.md): the independent RoboTwin data, post-training, normalization, and evaluation package.
 
-1. **Cross-attempt PIM:** a completed attempt commits a bounded BIT trace; a later attempt in the same episode can retrieve it.
-2. **Within-episode PIM:** each decision reads only BITs from strictly earlier H15 boundaries in the current episode.
+These packages are independent of the CTE/BIT/EAP/PIM implementation. Their training code and configuration remain included.
 
-The two settings share the same CTE/BIT/EAP parent and differ only in the lifetime and write boundary of PIM.
+## RoboTwin PIM evaluation
 
-## Supported platforms
+1. Set up the [runtime](docs/README.md) and download the separate [PIM inference checkpoint](scripts/robotwin/README_CHECKPOINT.md).
+2. Connect a RoboTwin simulator adapter using the interface in the [evaluation guide](scripts/robotwin/README_EVALUATION.md).
+3. Run up to four attempts per frozen episode, stopping on success. The report contains cumulative success rates after attempts 1–4, with a fixed episode denominator.
 
-- RoboTwin
-- Real robots through the OpenPI websocket server and lightweight client
-- ALOHA and DROID data/policy adapters used for real-robot integration
-
-## Repository layout
+## Code layout
 
 ```text
 src/openpi/zeva/
-  cte_eap.py             CTE, BIT objectives, and EAP
-  cte_eap_policy.py      RoboTwin training/deployment composition
-  pim_policy.py          cross-attempt and within-episode PIM
-  robotwin_contract.py   RoboTwin action/image/handoff contract
-  robotwin_data.py       RoboTwin dataset adapter
+  cte_eap.py              Mamba CTE, EAP, and training objectives
+  cte_eap_policy.py       task-memory and training/inference composition
+  pim_policy.py          PIM training/inference and memory compression
+  pim_release.py         standalone checkpoint verification/loading
+  robotwin_contract.py   action, camera, and normalization contracts
   robotwin_policy.py     foundation-policy integration
-  tri_stream.py          causal tri-stream sequence block
 scripts/robotwin/
-  train_cte.py
-  export_cte_artifacts.py
-  train_cte_eap.py
-  build_cross_attempt_pim.py
-  train_cross_attempt_pim.py
-  train_within_episode_pim.py
+  evaluate_multiattempt.py
+  multiattempt_protocol.py
+  report_multiattempt.py
 configs/
-  robotwin_pim_training_settings.json
-docs/
-  ROBOTWIN_REPRODUCTION.md
-  REAL_ROBOT_DEPLOYMENT.md
+  robotwin_multiattempt_original10x20.json
 pipelines/
-  ego_action_encoder/    RGB-pair action-token encoder training and inference
-  robotwin_clean/        clean-only RoboTwin post-training and randomized evaluation
+  ego_action_encoder/     visual action encoder training and inference
+  robotwin_clean/         independent RoboTwin training and evaluation
 ```
 
-The two `pipelines/` packages are code-only and independent of the ICCL implementation. They expect caller-provided checkpoints and already-prepared data, and do not modify `src/openpi/zeva`.
-
-## Training and evaluation
-
-The public recipe has four stages:
-
-1. Train CTE/BIT for 80 epochs.
-2. Export train-only task memory and H15 traces.
-3. Train the foundation policy with EAP for 5000 optimizer steps.
-4. Train either PIM setting for 2000 optimizer steps.
-
-Every path is provided explicitly on the command line; the repository contains no cluster-specific paths or credentials.
-
-See the [documentation index](docs/README.md) for installation and the ICCL training and deployment guides. Pipeline-specific commands live with their corresponding packages:
-
-- [Ego action encoder](pipelines/ego_action_encoder/README.md) provides the two-stage visual action encoder, release training recipes, and RGB-pair inference API.
-- [RoboTwin Clean](pipelines/robotwin_clean/README.md) provides the Joint14 / chunk-start-relative EEF16 clean post-training and randomized evaluation boundary.
-
-## Real-robot deployment
-
-The policy server and lightweight robot client are documented in [real-robot deployment](docs/REAL_ROBOT_DEPLOYMENT.md).
-
-## Reproducibility and safety
-
-- CTE consumes only past executed actions.
-- Within-episode PIM reads only strictly earlier BITs.
-- Cross-attempt PIM commits memory only at an explicit attempt reset.
-- Episode reset clears all recurrent and persistent state.
-- Checkpoints contain model, adapter, optimizer state, and per-rank RNG state.
-- Output directories must be empty; training never silently overwrites a run.
+OpenPI websocket utilities and ALOHA/DROID adapters are retained for [real-robot integration](docs/REAL_ROBOT_DEPLOYMENT.md). The RoboTwin checkpoint is not a ready-to-run real-robot policy: camera, state, action, and safety contracts must match the target robot.
 
 ## License
 
-See [LICENSE](LICENSE), [LICENSE_GEMMA.txt](LICENSE_GEMMA.txt), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+See [LICENSE](LICENSE), [LICENSE_GEMMA.txt](LICENSE_GEMMA.txt), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Keep the bundled terms with redistributed checkpoints.

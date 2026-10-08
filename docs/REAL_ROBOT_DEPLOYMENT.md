@@ -13,7 +13,7 @@ uv run scripts/serve_policy.py policy:checkpoint \
   --port 8000
 ```
 
-For ZeVA RoboTwin/real-robot integration, construct `ZevaCTEEAPPolicy`, `ZevaCrossAttemptPIMPolicy`, or `ZevaEpisodePIMPolicy` in the server process and expose its inference method through the same websocket protocol.
+For ZeVA PIM integration, construct `ZevaCrossAttemptPIMPolicy.from_release(...)` in a custom server adapter and expose its inference method and reset operation through the same websocket protocol. See the [checkpoint guide](../scripts/robotwin/README_CHECKPOINT.md). A RoboTwin checkpoint requires matching camera/state/action contracts before real-robot use; the generic server command above does not load this PIM package automatically.
 
 ## Robot computer
 
@@ -48,7 +48,6 @@ action_chunk = client.infer(observation)["actions"]
 
 Call the policy reset endpoint before the first observation of every episode.
 
-- CTE/BIT/EAP and within-episode PIM: episode reset only.
 - Cross-attempt PIM: use attempt reset to commit a failed attempt, and episode reset when the scene or instruction changes.
 
 Never reuse PIM across tasks, scenes, or episodes.
