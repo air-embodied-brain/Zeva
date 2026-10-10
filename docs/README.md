@@ -18,6 +18,7 @@ The checkpoint loader needs the LeRobot PI0.5 runtime, Torch, Transformers, Safe
 
 - [PIM checkpoint loading and memory options](../scripts/robotwin/README_CHECKPOINT.md)
 - [Multi-attempt evaluation and cumulative rates](../scripts/robotwin/README_EVALUATION.md)
+- [RoboTwin CTE dataset adapter and cache format](../scripts/robotwin/README_DATASET.md)
 - [Real-robot integration](REAL_ROBOT_DEPLOYMENT.md)
 - [Remote inference](remote_inference.md)
 - [Docker environment](docker.md)

@@ -10,14 +10,13 @@ from typing import Any
 import torch
 
 from openpi.zeva.robotwin_contract import ROBOTWIN_CAMERA_KEYS
+from openpi.zeva.robotwin_dataset import RoboTwinLeRobotEEF16Dataset
 
 
 class TorchCodecRoboTwinDataset:
     """Exact handoff adapter with cached TorchCodec video decoders."""
 
     def __init__(self, manifest: str | Path, subset: str):
-        from egoscale.data.robotwin.lerobot import RoboTwinLeRobotEEF16Dataset  # noqa: PLC0415
-
         self.dataset = RoboTwinLeRobotEEF16Dataset(manifest, subset=subset)
         self.dataset.video_backend = "torchcodec"
         self.dataset._read_source_images = lambda _record, _frame: {}  # noqa: SLF001
@@ -26,6 +25,7 @@ class TorchCodecRoboTwinDataset:
         self, record: dict[str, Any], frames: list[int]
     ) -> dict[str, torch.Tensor]:
         import typing  # noqa: PLC0415
+
         import typing_extensions  # noqa: PLC0415
 
         for name in ("Self", "Unpack", "NotRequired"):
