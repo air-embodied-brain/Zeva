@@ -66,6 +66,11 @@ cd cosmos-framework
 Install the remaining Cosmos Framework dependencies following the upstream
 [setup instructions](https://github.com/NVIDIA/cosmos-framework/blob/main/docs/setup.md).
 
+## Training and memory
+
+The [two-stage training guide](docs/two_stage_training.md) covers dataset and
+policy adapters, how memory conditions action generation, and offline replay.
+
 ## Reproduction
 
 > [!NOTE]

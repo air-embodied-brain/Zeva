@@ -3,6 +3,9 @@ __pycache__/
 .DS_Store
 .venv/
 .env
+examples/training/*.local.json
+examples/training/inputs/
+examples/training/runs/
 outputs/
 checkpoints/
 pretrained/

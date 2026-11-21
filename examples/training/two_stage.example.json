@@ -1,0 +1,24 @@
+{
+  "output": "runs/two_stage",
+  "episode_manifest": "inputs/episodes.json",
+  "policy_checkpoint": "runs/two_stage/policy",
+  "paired_evidence": "runs/two_stage/paired_evidence.json",
+  "prepare_command": ["python", "prepare_episodes.py"],
+  "policy_command": ["python", "-m", "cosmos_framework.scripts.train", "--sft-toml", "policy.toml"],
+  "replay_command": ["python", "record_paired_evidence.py"],
+  "stage1": {
+    "epochs": 80,
+    "batch_size": 8,
+    "device": "cuda",
+    "vision_lr": 0.00001,
+    "lr": 0.0001,
+    "model": {"action_dim": 8, "transition_steps": 4}
+  },
+  "memory": {
+    "warmup": 8,
+    "evidence_limit": 16,
+    "fixed_capacity": 4,
+    "max_harm": 0.30,
+    "harm_margins": {"action": 0.0, "effect": 0.0}
+  }
+}
