@@ -68,6 +68,9 @@ Install the remaining Cosmos Framework dependencies following the upstream
 
 ## Reproduction
 
+For training with a dataset adapter and evaluating completed-trial memory on a
+new set of demonstrations, see [Two-stage training](docs/two_stage_training.md).
+
 > [!NOTE]
 > The released checkpoint was trained on success-only trajectories and
 > evaluated without cross-attempt self-evolution. Its benchmark success rate
